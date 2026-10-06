@@ -43,6 +43,8 @@ def main() -> None:
     win.show()
     if len(sys.argv) > 2 and sys.argv[1] == "--selftest":
         _selftest(win, sys.argv[2])
+    elif len(sys.argv) > 2 and sys.argv[1] == "--selftest-ocr":
+        _selftest_ocr(win, sys.argv[2])
     sys.exit(app.exec())
 
 
@@ -64,6 +66,22 @@ def _selftest(win, wav_path: str) -> None:
         win.cfg.music_mode = True
     QTimer.singleShot(500, win._toggle_running)
     QTimer.singleShot(90_000, win.quit_app)
+
+
+def _selftest_ocr(win, image_path: str) -> None:
+    """Packaged-build check for screen text: OCR an image, translate the lines, log, quit."""
+    import cv2
+
+    from livetranslate.screen.ocr import ScreenOCR
+    from livetranslate.translation import create_translator
+
+    log = logging.getLogger("selftest")
+    lines = ScreenOCR().read(cv2.imread(image_path))
+    tr = create_translator(win.cfg.translation)
+    for line in lines:
+        out = tr.translate(line.text, None, win.cfg.translation.target_language, [], kind="text") if tr else None
+        log.info("SELFTEST-OCR %s -> %s", line.text, out)
+    win.quit_app()
 
 
 if __name__ == "__main__":
