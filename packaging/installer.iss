@@ -20,7 +20,10 @@ SetupIconFile=icon.ico
 UninstallDisplayIcon={app}\LiveTranslate.exe
 Compression=lzma2/fast
 SolidCompression=no
-DiskSpanning=no
+; GitHub release assets are capped at 2 GiB, so split the installer into the .exe plus
+; .bin slices; users download all of them into one folder and run the .exe.
+DiskSpanning=yes
+DiskSliceSize=1900000000
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 WizardStyle=modern

@@ -19,4 +19,4 @@ if (-not $iscc) {
 }
 & $iscc "/DAppVersion=$version" "$root\packaging\installer.iss"
 if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed" }
-Write-Host "Installer: $root\dist\LiveTranslate-Setup-$version.exe"
+Write-Host "Installer: $rootdistelease (LiveTranslate-Setup-$version.exe + .bin slices)"
