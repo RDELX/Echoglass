@@ -1,6 +1,9 @@
 # Rebuild the installer:  powershell -ExecutionPolicy Bypass -File packaging\build.ps1 [-Publish]
-# 1. PyInstaller bundles the app into dist\LiveTranslate\ (+ files.json manifest)
-# 2. Inno Setup wraps it into dist\release\LiveTranslate-Setup-<version>.exe + .bin slices
+# 1. PyInstaller bundles the app into dist\LiveTranslate\ (+ files.json manifest), without
+#    PyTorch, which this project doesn't redistribute
+# 2. Inno Setup makes a small web installer dist\release\LiveTranslate-Setup-<version>.exe
+#    that downloads PyTorch from download.pytorch.org (and optionally the Whisper model from
+#    Hugging Face) during setup
 # 3. update-from-<old>.zip deltas against earlier GitHub releases, for in-app partial updates
 # 4. -Publish: tag v<version> and create the GitHub release with everything in dist\release
 param([switch]$Publish)
@@ -23,8 +26,14 @@ Copy-Item "$root\browser-extension" $ext -Recurse
 $manifest = (Get-Content "$root\browser-extension\manifest.json" -Raw) -replace '"version": "[^"]+"', "`"version`": `"$version`""
 [IO.File]::WriteAllText("$ext\manifest.json", $manifest, (New-Object Text.UTF8Encoding $false))  # no BOM
 
+# Installer entries that download PyTorch/torchaudio from download.pytorch.org.
+$deps = & $py "$root\packaging\make_deps.py"
+if ($LASTEXITCODE -ne 0) { throw "make_deps failed" }
+$deps | Select-Object -SkipLast 1 | Write-Host
+$runtimeId = $deps[-1]
+
 # Per-file hashes, so later builds can ship only what changed.
-& $py "$root\packaging\make_update.py" manifest "$root\dist\LiveTranslate" $version
+& $py "$root\packaging\make_update.py" manifest "$root\dist\LiveTranslate" $version $runtimeId
 if ($LASTEXITCODE -ne 0) { throw "manifest failed" }
 
 $iscc = @("$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe", "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe", "$env:ProgramFiles\Inno Setup 6\ISCC.exe") |

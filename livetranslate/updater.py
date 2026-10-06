@@ -80,7 +80,7 @@ def check(repo: str = RELEASES_REPO, timeout: float = 6) -> Release | None:
         return None
     patch = f"update-from-{__version__}.zip"
     if patch not in assets or not (app_dir() / "files.json").exists():
-        patch = None
+        patch = None  # (deltas are only built when the GPU runtime is unchanged)
     return Release(version, data.get("body") or "", data.get("html_url", ""), assets, patch)
 
 
