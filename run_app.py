@@ -40,7 +40,29 @@ def main() -> None:
     theme.apply(app)
     win = MainWindow(settings.load())
     win.show()
+    if len(sys.argv) > 2 and sys.argv[1] == "--selftest":
+        _selftest(win, sys.argv[2])
     sys.exit(app.exec())
+
+
+def _selftest(win, wav_path: str) -> None:
+    """Packaged-build check: start, push a WAV through the pipeline, log results, quit."""
+    import wave
+
+    import numpy as np
+    from PyQt6.QtCore import QTimer
+
+    log = logging.getLogger("selftest")
+    with wave.open(wav_path, "rb") as w:
+        audio = np.frombuffer(w.readframes(w.getnframes()), np.int16).astype(np.float32) / 32768
+
+    win.engine.translated.connect(lambda _id, r: log.info("SELFTEST %s | %s -> %s", r.transcript.language,
+                                                          r.transcript.text, r.translation))
+    win.engine.running_changed.connect(lambda on: on and win.engine._pipeline.feed(audio))
+    if "--music" in sys.argv:
+        win.cfg.music_mode = True
+    QTimer.singleShot(500, win._toggle_running)
+    QTimer.singleShot(90_000, win.close)
 
 
 if __name__ == "__main__":
