@@ -125,6 +125,9 @@ class SettingsDialog(QDialog):
         self.close_to_tray = QCheckBox("Closing the window keeps LiveTranslate running in the tray")
         self.close_to_tray.setChecked(self.cfg.ui.close_to_tray)
         form.addRow("Window", self.close_to_tray)
+        self.check_updates = QCheckBox("Check for new versions when LiveTranslate starts")
+        self.check_updates.setChecked(self.cfg.ui.check_updates)
+        form.addRow("Updates", self.check_updates)
 
         form.addRow(_section("Browser extension"))
         self.api_enabled = QCheckBox("Allow the LiveTranslate Chrome extension to connect")
@@ -314,6 +317,7 @@ class SettingsDialog(QDialog):
         cfg.vad.min_silence_ms = self.pause.value()
 
         cfg.ui.close_to_tray = self.close_to_tray.isChecked()
+        cfg.ui.check_updates = self.check_updates.isChecked()
         cfg.api.enabled = self.api_enabled.isChecked()
         cfg.api.port = self.api_port.value()
 

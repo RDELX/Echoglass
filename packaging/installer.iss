@@ -41,6 +41,8 @@ Name: "{autodesktop}\LiveTranslate"; Filename: "{app}\LiveTranslate.exe"; Tasks:
 
 [Run]
 Filename: "{app}\LiveTranslate.exe"; Description: "Launch LiveTranslate"; Flags: nowait postinstall skipifsilent
+; In-app updates run the installer with /SILENT: relaunch the app when it finishes.
+Filename: "{app}\LiveTranslate.exe"; Flags: nowait skipifnotsilent
 
 ; Settings (%APPDATA%\LiveTranslate) and downloaded models (%USERPROFILE%\.cache\huggingface)
 ; are kept on uninstall so a reinstall doesn't re-download 3 GB.

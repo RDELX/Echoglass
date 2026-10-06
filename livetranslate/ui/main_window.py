@@ -18,6 +18,8 @@ from .engine import Engine
 from .overlay import SubtitleOverlay
 from .settings_dialog import SettingsDialog
 from .transcript_view import TranscriptView
+from .update_banner import UpdateBanner
+from .. import updater
 
 BACKEND_LABELS = [
     ("ollama", "Ollama (local)"),
@@ -68,6 +70,8 @@ class MainWindow(QMainWindow):
         lay.setContentsMargins(20, 16, 20, 16)
         lay.setSpacing(14)
         lay.addLayout(self._build_top_bar())
+        self.update_banner = UpdateBanner(self._prepare_for_update)
+        lay.addWidget(self.update_banner)
         self.view = TranscriptView()
         self.view.set_target_language(cfg.translation.target_language)
         self.view.mode = cfg.ui.view_mode
@@ -105,6 +109,8 @@ class MainWindow(QMainWindow):
                              overlay=self._bridge.overlay.emit)
         if cfg.api.enabled:
             self.api.start()
+        if cfg.ui.check_updates and updater.can_self_update():
+            self.update_banner.check()
 
     # ---- tray ------------------------------------------------------------------------
 
@@ -119,6 +125,8 @@ class MainWindow(QMainWindow):
         self.overlay_btn.toggled.connect(self.tray_overlay.setChecked)
         menu.addAction(self.tray_overlay)
         menu.addSeparator()
+        menu.addAction("Check for updates", lambda: (self._show_window(),
+                                                      self.update_banner.check(manual=True)))
         menu.addAction("Quit", self.quit_app)
         self.tray.setContextMenu(menu)
         self._tray_menu = menu
@@ -132,6 +140,16 @@ class MainWindow(QMainWindow):
         self.showNormal()
         self.raise_()
         self.activateWindow()
+
+    def _prepare_for_update(self) -> None:
+        """Everything closeEvent does on quit, before the installer replaces our files."""
+        self._quitting = True
+        self._save_settings()
+        self.api.stop()
+        self.overlay.close()
+        self.tray.hide()
+        self.hide()
+        self.engine.shutdown()
 
     def quit_app(self) -> None:
         self._quitting = True
@@ -335,6 +353,7 @@ class MainWindow(QMainWindow):
         for section in ("asr", "vad", "translation", "overlay", "api"):
             setattr(self.cfg, section, getattr(new, section))
         self.cfg.ui.close_to_tray = new.ui.close_to_tray
+        self.cfg.ui.check_updates = new.ui.check_updates
         self.api.cfg = self.cfg
         if api_changed:
             self.api.stop()

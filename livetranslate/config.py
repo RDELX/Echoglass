@@ -65,6 +65,7 @@ class UiConfig:
     overlay_visible: bool = False
     close_to_tray: bool = True      # the window's X hides to the system tray
     tray_hint_shown: bool = False
+    check_updates: bool = True      # look for a newer release on startup
 
 
 @dataclass
