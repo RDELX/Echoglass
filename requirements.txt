@@ -1,0 +1,23 @@
+# Stage 1: capture + VAD + ASR
+faster-whisper
+pyaudiowpatch
+pysilero-vad
+soxr
+numpy
+nvidia-cublas-cu12
+nvidia-cudnn-cu12==9.*
+
+# Stage 2: translation backends
+openai
+deepl
+anthropic
+
+# Music mode: vocal isolation (PyTorch from the CUDA index)
+# pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu128
+demucs
+
+# Stage 3: UI
+PyQt6
+
+# Stage 4: API keys in Windows Credential Manager
+keyring
