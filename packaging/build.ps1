@@ -17,6 +17,10 @@ if (-not $iscc) {
     Write-Warning "Inno Setup not found; the app is in dist\LiveTranslate\ but no installer was made."
     exit 0
 }
-& $iscc "/DAppVersion=$version" "$root\packaging\installer.iss"
+$out = "$root\dist\release"
+Remove-Item $out -Recurse -Force -ErrorAction SilentlyContinue
+& $iscc "/O$out" "/DAppVersion=$version" "$root\packaging\installer.iss"
 if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed" }
-Write-Host "Installer: $rootdistelease (LiveTranslate-Setup-$version.exe + .bin slices)"
+Get-ChildItem $out -File | Get-FileHash -Algorithm SHA256 |
+    ForEach-Object { "$($_.Hash.ToLower())  $(Split-Path $_.Path -Leaf)" } | Set-Content "$out\SHA256SUMS.txt"
+Write-Host "Installer: $out (LiveTranslate-Setup-$version.exe + .bin slices + SHA256SUMS.txt)"
