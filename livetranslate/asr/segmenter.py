@@ -17,6 +17,7 @@ FRAME_MS = FRAME * 1000 // SAMPLE_RATE
 class Utterance:
     audio: np.ndarray  # 16 kHz mono float32
     start: float       # seconds since the segmenter started
+    uid: int = 0       # same id for an utterance's partial snapshots and its final version
 
 
 class Segmenter:
@@ -38,6 +39,7 @@ class Segmenter:
         self._in_speech = False
         self._utt_start_frame = 0
         self._frame_index = 0
+        self._uid = 0
 
     def feed(self, chunk: np.ndarray) -> list[Utterance]:
         self._pending = np.concatenate([self._pending, chunk.astype(np.float32, copy=False)])
@@ -50,6 +52,13 @@ class Segmenter:
                 done.append(utt)
         self._pending = self._pending[n * FRAME:]
         return done
+
+    def snapshot(self, min_s: float = 0.8) -> Utterance | None:
+        """The utterance still being spoken, so far (for live partial captions)."""
+        if not self._in_speech or len(self._frames) * FRAME < min_s * SAMPLE_RATE:
+            return None
+        return Utterance(np.concatenate(self._frames), self._utt_start_frame * FRAME / SAMPLE_RATE,
+                         self._uid)
 
     def flush(self) -> Utterance | None:
         """Close any open utterance (e.g. on Stop)."""
@@ -64,6 +73,7 @@ class Segmenter:
             self._pre_roll.append(frame)
             if prob >= cfg.threshold:
                 self._in_speech = True
+                self._uid += 1
                 self._frames = list(self._pre_roll)
                 self._pre_roll.clear()
                 self._utt_start_frame = self._frame_index - len(self._frames)
@@ -96,4 +106,4 @@ class Segmenter:
         self._silence_frames = 0
         if speech * FRAME_MS < self.cfg.min_speech_ms:
             return None
-        return Utterance(audio=np.concatenate(frames), start=start)
+        return Utterance(audio=np.concatenate(frames), start=start, uid=self._uid)

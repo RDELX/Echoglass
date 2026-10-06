@@ -10,6 +10,8 @@ class AsrConfig:
     compute_type: str = "float16"
     language: str | None = None  # None = auto-detect per utterance; or force e.g. "ja"
     beam_size: int = 5
+    live_captions: bool = True      # show sentences while they're still being spoken
+    live_interval_s: float = 0.6    # how often the unfinished sentence is re-transcribed
     # Drop segments Whisper itself thinks are not speech. Music mode lowers this, because
     # leftover instruments make Whisper invent "Thank you." etc. with high no_speech_prob.
     max_no_speech_prob: float = 1.0

@@ -23,6 +23,8 @@ class Engine(QObject):
     running_changed = pyqtSignal(bool)
     original = pyqtSignal(int, object)      # entry id, Transcript
     translated = pyqtSignal(int, object)    # entry id, Translated
+    live = pyqtSignal(object)               # Transcript of the sentence still being spoken
+    live_translated = pyqtSignal(object)    # Translated for that partial
 
     def __init__(self, cfg: Config):
         super().__init__()
@@ -82,8 +84,11 @@ class Engine(QObject):
                 self.status.emit("Starting translator…", "busy")
                 translator = create_translator(self.cfg.translation)
             tc = self.cfg.translation
+            # Partial lines are only translated by local models (free); cloud services
+            # would bill for every half-second update.
             self._worker = TranslationWorker(translator, tc.target_language, tc.context_lines,
-                                             self._on_translated)
+                                             self._on_translated,
+                                             translate_partials=tc.backend in ("ollama", "lmstudio"))
             self._worker.start()
             self._worker.warmup()
 
@@ -143,6 +148,7 @@ class Engine(QObject):
                 return
             if self._worker is not None:
                 self._worker.translator = t
+                self._worker.translate_partials = backend in ("ollama", "lmstudio")
                 self._worker._context.clear()
                 self._worker.warmup()
                 self.status.emit(f"Translating with {t.label}" if t else "Translation off", "live")
@@ -151,6 +157,11 @@ class Engine(QObject):
     # ---- pipeline callbacks (worker threads) -----------------------------------------
 
     def _on_transcript(self, t: Transcript) -> None:
+        if not t.final:
+            self.live.emit(t)
+            if self._worker is not None:
+                self._worker.submit(t)
+            return
         entry = next(self._ids)
         self._entry_of[id(t)] = entry
         self.original.emit(entry, t)
@@ -158,6 +169,9 @@ class Engine(QObject):
             self._worker.submit(t)
 
     def _on_translated(self, r: Translated) -> None:
+        if not r.transcript.final:
+            self.live_translated.emit(r)
+            return
         entry = self._entry_of.pop(id(r.transcript), None)
         if entry is not None:
             self.translated.emit(entry, r)

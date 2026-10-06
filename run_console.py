@@ -77,6 +77,7 @@ def main() -> None:
     cfg.device_index = args.device
     cfg.music_mode = args.music
     cfg.sync_music_mode()
+    cfg.asr.live_captions = False  # the console only prints finished lines
     tc = cfg.translation
     tc.backend, tc.target_language = args.translator, args.to
     if args.llm_model:

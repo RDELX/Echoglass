@@ -2,11 +2,17 @@
 
 The pipeline only produces `Transcript`s through a callback; consumers (console,
 translation, Qt UI) decide what to do with them.
+
+Live captions: while someone is still talking, the segmenter's open utterance is
+snapshotted every `live_interval_s` and transcribed quickly as a partial
+(`Transcript.final=False`). Partials only run when no finished utterance is waiting, and
+only the newest snapshot is kept, so they never delay final lines.
 """
 
 import logging
 import queue
 import threading
+import time
 from typing import Callable
 
 import numpy as np
@@ -35,6 +41,9 @@ class Pipeline:
         self._utt_q: "queue.Queue[Utterance | object]" = queue.Queue()
         self._capture: LoopbackCapture | None = None
         self._threads: list[threading.Thread] = []
+        self._partial: Utterance | None = None   # newest snapshot of the open utterance
+        self._partial_lock = threading.Lock()
+        self._last_final_uid = 0
 
     def start(self) -> None:
         self.start_without_capture()
@@ -69,6 +78,7 @@ class Pipeline:
 
     def _segment_loop(self) -> None:
         seg = Segmenter(self.cfg.vad)
+        last_snapshot = 0.0
         while True:
             chunk = self._audio_q.get()
             if chunk is _STOP:
@@ -84,16 +94,41 @@ class Pipeline:
                 chunk = self.separator.feed(chunk)
             for utt in seg.feed(chunk):
                 self._utt_q.put(utt)
+            live = self.cfg.asr.live_captions
+            if live and time.monotonic() - last_snapshot >= self.cfg.asr.live_interval_s:
+                snap = seg.snapshot()
+                if snap is not None:
+                    last_snapshot = time.monotonic()
+                    with self._partial_lock:
+                        self._partial = snap
 
     def _asr_loop(self) -> None:
         while True:
-            utt = self._utt_q.get()
+            try:
+                utt = self._utt_q.get(timeout=0.05)
+            except queue.Empty:
+                self._run_partial()
+                continue
             if utt is _STOP:
                 return
+            self._last_final_uid = max(self._last_final_uid, utt.uid)
             try:
-                result = self.transcriber.transcribe(utt.audio, utt.start)
+                result = self.transcriber.transcribe(utt.audio, utt.start, utt.uid, final=True)
             except Exception:
                 log.exception("Transcription failed")
                 continue
             if result is not None:
                 self.on_transcript(result)
+
+    def _run_partial(self) -> None:
+        with self._partial_lock:
+            snap, self._partial = self._partial, None
+        if snap is None or snap.uid <= self._last_final_uid:
+            return  # that sentence already finished
+        try:
+            result = self.transcriber.transcribe(snap.audio, snap.start, snap.uid, final=False)
+        except Exception:
+            log.exception("Partial transcription failed")
+            return
+        if result is not None and snap.uid > self._last_final_uid:
+            self.on_transcript(result)

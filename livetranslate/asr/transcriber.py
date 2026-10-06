@@ -57,6 +57,8 @@ class Transcript:
     start: float          # seconds since capture start
     duration: float       # utterance length in seconds
     asr_seconds: float    # time Whisper took
+    uid: int = 0          # utterance id (partials and the final share it)
+    final: bool = True    # False = live partial of a sentence still being spoken
 
 
 class Transcriber:
@@ -73,9 +75,15 @@ class Transcriber:
         """Run one tiny inference so the first real utterance isn't slowed by CUDA init."""
         self.model.transcribe(np.zeros(16000, dtype=np.float32), language=self.cfg.language or "en")
 
-    def _pick_language(self, audio: np.ndarray) -> str:
+    def _pick_language(self, audio: np.ndarray, update: bool = True) -> str | None:
         """Detect per utterance, but don't let a short or unclear line flip the language."""
+        if not update and self._sticky_language:
+            return self._sticky_language  # partials: reuse, don't spend a detection pass
         lang, prob, _ = self.model.detect_language(audio)
+        if not update:
+            # Partials are short: a wrong guess shows nonsense in another language, so
+            # only show them once the language is clear.
+            return lang if prob >= _LANG_CONFIDENT else None
         if self._sticky_language is None and prob < 0.5:
             return lang  # too unsure to lock in a language yet
         if prob >= _LANG_CONFIDENT or self._sticky_language is None:
@@ -85,13 +93,17 @@ class Transcriber:
             return lang
         return self._sticky_language
 
-    def transcribe(self, audio: np.ndarray, start: float) -> Transcript | None:
+    def transcribe(self, audio: np.ndarray, start: float, uid: int = 0,
+                   final: bool = True) -> Transcript | None:
+        """`final=False` is a quick greedy pass for live captions of an unfinished sentence."""
         t0 = time.perf_counter()
-        language = self.cfg.language or self._pick_language(audio)
+        language = self.cfg.language or self._pick_language(audio, update=final)
+        if language is None:
+            return None
         segments, info = self.model.transcribe(
             audio,
             language=language,
-            beam_size=self.cfg.beam_size,
+            beam_size=self.cfg.beam_size if final else 1,
             vad_filter=False,                 # we already segmented with Silero
             condition_on_previous_text=False,  # avoids repetition loops across utterances
             without_timestamps=True,
@@ -113,4 +125,6 @@ class Transcriber:
             start=start,
             duration=len(audio) / 16000,
             asr_seconds=time.perf_counter() - t0,
+            uid=uid,
+            final=final,
         )

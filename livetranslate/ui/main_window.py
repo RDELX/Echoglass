@@ -2,7 +2,7 @@
 
 from collections import deque
 
-from PyQt6.QtCore import QByteArray, QObject, Qt, pyqtSignal
+from PyQt6.QtCore import QByteArray, QObject, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QAction, QIcon, QKeySequence, QShortcut
 from PyQt6.QtWidgets import (QApplication, QButtonGroup, QComboBox, QHBoxLayout, QLabel, QMainWindow,
                              QMenu, QSystemTrayIcon,
@@ -17,7 +17,7 @@ from . import theme
 from .engine import Engine
 from .overlay import SubtitleOverlay
 from .settings_dialog import SettingsDialog
-from .transcript_view import TranscriptView
+from .transcript_view import Entry, TranscriptView
 from .update_banner import UpdateBanner
 from .. import updater
 
@@ -90,6 +90,13 @@ class MainWindow(QMainWindow):
         self.engine.running_changed.connect(self._on_running)
         self.engine.original.connect(self._on_original)
         self.engine.translated.connect(self._on_translated)
+        self.engine.live.connect(self._on_live)
+        self.engine.live_translated.connect(self._on_live_translated)
+        self._live: Entry | None = None
+        self._live_uid = 0
+        # A partial whose sentence got dropped (too short, filtered) never gets a final line.
+        self._live_expiry = QTimer(self, singleShot=True, interval=4000,
+                                   timeout=lambda: self._set_live(None))
 
         QShortcut(QKeySequence("Ctrl+Return"), self, activated=self._toggle_running)
         QShortcut(QKeySequence("Ctrl+="), self, activated=lambda: self.view.change_font_size(1))
@@ -323,6 +330,7 @@ class MainWindow(QMainWindow):
     # ---- actions ---------------------------------------------------------------------
 
     def view_clear(self) -> None:
+        self._set_live(None)
         self.view.clear()
         self.overlay.clear()
 
@@ -434,16 +442,49 @@ class MainWindow(QMainWindow):
                                         "Speech appears here as it's recognised.")
             self.stats.clear()
 
+    # ---- live (partial) captions -----------------------------------------------------
+
+    def _set_live(self, e: Entry | None) -> None:
+        self._live = e
+        self.view.set_live(e)
+        if self.overlay.isVisible():
+            self.overlay.show_entries(self.view.entries, e)
+
+    def _on_live(self, t) -> None:
+        if t.uid < self._live_uid:
+            return
+        prev = self._live if (self._live and t.uid == self._live_uid) else None
+        self._live_uid = t.uid
+        local = self.cfg.translation.backend in ("ollama", "lmstudio")
+        e = Entry(-t.uid, t.start, t.language, t.text,
+                  # keep showing the last partial translation until a newer one arrives
+                  translation=prev.translation if prev else None,
+                  state=(prev.state if prev and prev.state == "done" else
+                         "pending" if local else "off"))
+        if t.language == self.cfg.translation.target_language:
+            e.state = "same"
+        self._live_expiry.start()
+        self._set_live(e)
+
+    def _on_live_translated(self, r) -> None:
+        if self._live is None or r.transcript.uid != self._live_uid or not r.translation:
+            return
+        self._live.translation, self._live.state = r.translation, "done"
+        self._set_live(self._live)
+
     def _on_original(self, entry_id: int, t) -> None:
         translating = self.cfg.translation.backend != "none"
+        if self._live is not None and t.uid >= self._live_uid:
+            self._live = None
+            self.view.set_live(None)
         self.view.add_original(entry_id, t, translating)
         if self.overlay.isVisible():
-            self.overlay.show_entries(self.view.entries)
+            self.overlay.show_entries(self.view.entries, self._live)
 
     def _on_translated(self, entry_id: int, r) -> None:
         self.view.set_translation(entry_id, r)
         if self.overlay.isVisible():
-            self.overlay.show_entries(self.view.entries)
+            self.overlay.show_entries(self.view.entries, self._live)
         self._timings.append((r.transcript.asr_seconds, r.seconds))
         asr = sum(a for a, _ in self._timings) / len(self._timings)
         mt = sum(m for _, m in self._timings) / len(self._timings)

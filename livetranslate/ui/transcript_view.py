@@ -101,6 +101,14 @@ class _Row(QWidget):
         self.set_font(font_pt)
         self.update_entry(e)
 
+    def set_live(self, live: bool) -> None:
+        """Dimmed style for the sentence that's still being spoken."""
+        for lbl in (self.original, self.translation):
+            lbl.setProperty("live", live)
+            lbl.style().unpolish(lbl)
+            lbl.style().polish(lbl)
+        self.time.setText("live" if live else self.time.text())
+
     @staticmethod
     def _text_label(obj: str) -> QLabel:
         lbl = QLabel()
@@ -148,13 +156,16 @@ class LineView(QScrollArea):
         self._rows: dict[int, _Row] = {}
         self._font_pt = 13.0
         self.target_language: str | None = None
+        self._live_row: _Row | None = None
         self.sticky = _StickyScroll(self.verticalScrollBar(), self.unseen.emit)
 
     def add(self, e: Entry) -> None:
         row = _Row(e, self._font_pt)
         row.set_target_language(self.target_language)
         self._rows[e.id] = row
-        self._layout.insertWidget(self._layout.count() - 1, row)
+        # Finished rows go above the live row (if any), which stays last.
+        at = self._layout.count() - (2 if self._live_row is not None else 1)
+        self._layout.insertWidget(at, row)
         while len(self._rows) > MAX_ENTRIES:
             oldest = next(iter(self._rows))
             self._rows.pop(oldest).deleteLater()
@@ -162,6 +173,20 @@ class LineView(QScrollArea):
     def update_entry(self, e: Entry) -> None:
         if e.id in self._rows:
             self._rows[e.id].update_entry(e)
+
+    def set_live(self, e: Entry | None) -> None:
+        if e is None:
+            if self._live_row is not None:
+                self._live_row.deleteLater()
+                self._live_row = None
+            return
+        if self._live_row is None:
+            self._live_row = _Row(e, self._font_pt)
+            self._live_row.set_target_language(self.target_language)
+            self._live_row.set_live(True)
+            self._layout.insertWidget(self._layout.count() - 1, self._live_row)
+        else:
+            self._live_row.update_entry(e)
 
     def rebuild(self, entries: list[Entry]) -> None:
         self.clear()
@@ -209,7 +234,7 @@ class ParagraphView(QWidget):
     def sticky(self):
         return self._stickies[0]
 
-    def render(self, entries: list[Entry]) -> None:
+    def render(self, entries: list[Entry], live: Entry | None = None) -> None:
         paras_l, paras_r, cur_l, cur_r = [], [], [], []
         prev_end, prev_lang = None, None
         for e in entries:
@@ -227,6 +252,12 @@ class ParagraphView(QWidget):
                 cur_r.append(self._span(text, e.language if style == "" and e.state == "same"
                                         else self.target_language))
             prev_end, prev_lang = e.start, e.language
+        if live is not None:
+            dim = f'<span style="color:{theme.TEXT_2}">'
+            cur_l.append(dim + self._span(live.text, live.language) + "</span>")
+            text, style = _translation_text(live)
+            if style != "pending" and text:
+                cur_r.append(dim + self._span(text, self.target_language) + "</span>")
         if cur_l:
             paras_l.append(cur_l); paras_r.append(cur_r)
 
@@ -266,6 +297,7 @@ class TranscriptView(QFrame):
         self.setObjectName("transcriptFrame")
         self.entries: list[Entry] = []
         self._by_id: dict[int, Entry] = {}
+        self.live: Entry | None = None
         self.mode = "lines"
         self._font_pt = 13.0
 
@@ -353,7 +385,7 @@ class TranscriptView(QFrame):
         if self.mode == "lines":
             self.lines.add(e)
         else:
-            self.paragraphs.render(self.entries)
+            self.paragraphs.render(self.entries, self.live)
         self._show_content()
 
     def set_translation(self, entry_id: int, r) -> None:
@@ -369,7 +401,17 @@ class TranscriptView(QFrame):
         if self.mode == "lines":
             self.lines.update_entry(e)
         else:
-            self.paragraphs.render(self.entries)
+            self.paragraphs.render(self.entries, self.live)
+
+    def set_live(self, e: Entry | None) -> None:
+        """Show (or clear) the sentence that's still being spoken, below the finished lines."""
+        self.live = e
+        if self.mode == "lines":
+            self.lines.set_live(e)
+        else:
+            self.paragraphs.render(self.entries, e)
+        if e is not None:
+            self._show_content(force=True)
 
     def set_target_language(self, code: str) -> None:
         self.tgt_chip.setText(lang_name(code))
@@ -391,7 +433,7 @@ class TranscriptView(QFrame):
         if mode == "lines":
             self.lines.rebuild(self.entries)
         else:
-            self.paragraphs.render(self.entries)
+            self.paragraphs.render(self.entries, self.live)
             QTimer.singleShot(0, self.paragraphs.to_bottom)
         self.jump.hide()
         self._show_content()
@@ -407,8 +449,8 @@ class TranscriptView(QFrame):
 
     # ---- helpers ---------------------------------------------------------------------
 
-    def _show_content(self) -> None:
-        if not self.entries:
+    def _show_content(self, force: bool = False) -> None:
+        if not self.entries and not force:
             self.stack.setCurrentWidget(self.empty)
         else:
             self.stack.setCurrentWidget(self.lines if self.mode == "lines" else self.paragraphs)

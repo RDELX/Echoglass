@@ -227,6 +227,12 @@ class SettingsDialog(QDialog):
         self.pause.setToolTip("How long a pause ends a line. Shorter = faster subtitles, "
                               "but sentences get split more often")
         form.addRow("Pause that ends a line", self.pause)
+        self.live_captions = QCheckBox("Show sentences while they're still being spoken")
+        self.live_captions.setToolTip("Rolling captions: the current sentence grows live in the "
+                                      "window and overlay.\nUses more GPU. Local translators also "
+                                      "translate it live; cloud ones only translate finished lines.")
+        self.live_captions.setChecked(a.live_captions)
+        form.addRow("Live captions", self.live_captions)
         form.addRow(_note("Changing the Whisper model downloads it on first use "
                           "and takes effect the next time you press Start."))
         return w
@@ -315,6 +321,7 @@ class SettingsDialog(QDialog):
         cfg.vad.soft_max_s = self.max_len.value()
         cfg.vad.hard_max_s = max(cfg.vad.soft_max_s + 4, 15.0)
         cfg.vad.min_silence_ms = self.pause.value()
+        cfg.asr.live_captions = self.live_captions.isChecked()
 
         cfg.ui.close_to_tray = self.close_to_tray.isChecked()
         cfg.ui.check_updates = self.check_updates.isChecked()

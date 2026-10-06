@@ -2,9 +2,12 @@
 
 Unlocked: shows a frame you can drag and resize. Locked: mouse clicks pass straight
 through to the video underneath; unlock it from the main window.
+
+Rolling captions: the sentence still being spoken is shown live (dimmed) at the bottom and
+grows as it's recognised; when lines are added the text block slides up smoothly.
 """
 
-from PyQt6.QtCore import QPoint, QRect, Qt, QTimer
+from PyQt6.QtCore import QEasingCurve, QPoint, QPropertyAnimation, QRect, Qt, QTimer
 from PyQt6.QtGui import QColor, QFont, QGuiApplication, QPainter, QPen
 from PyQt6.QtWidgets import (QGraphicsDropShadowEffect, QLabel, QSizeGrip, QVBoxLayout,
                              QWidget)
@@ -19,6 +22,7 @@ class SubtitleOverlay(QWidget):
         super().__init__(None)
         self.cfg = cfg
         self._entries: list[Entry] = []
+        self._live: Entry | None = None
         self._target_lang: str | None = None
         self._drag_from: QPoint | None = None
         self._faded = True
@@ -38,8 +42,19 @@ class SubtitleOverlay(QWidget):
         self.hint.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         lay.addWidget(self.hint)
         lay.addStretch(1)
+
+        # Subtitle block: positioned by hand (anchored to the bottom) so it can slide.
+        self._body = QWidget(self)
+        self._body.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        body_lay = QVBoxLayout(self._body)
+        body_lay.setContentsMargins(0, 0, 0, 0)
+        body_lay.setSpacing(4)
+        self._slide = QPropertyAnimation(self._body, b"pos", self)
+        self._slide.setDuration(220)
+        self._slide.setEasingCurve(QEasingCurve.Type.OutCubic)
+        self._slide.valueChanged.connect(lambda _: self.update())
         self._labels: list[tuple[QLabel, QLabel]] = []
-        for _ in range(4):
+        for _ in range(5):  # up to 4 finished lines + the live one
             orig, trans = QLabel(), QLabel()
             for lbl in (orig, trans):
                 lbl.setWordWrap(True)
@@ -52,8 +67,8 @@ class SubtitleOverlay(QWidget):
                 lbl.setGraphicsEffect(shadow)
             orig.setStyleSheet("color: rgba(230,232,238,0.78);")
             trans.setStyleSheet("color: #ffffff;")
-            lay.addWidget(orig)
-            lay.addWidget(trans)
+            body_lay.addWidget(orig)
+            body_lay.addWidget(trans)
             self._labels.append((orig, trans))
 
         self.grip = QSizeGrip(self)
@@ -99,28 +114,34 @@ class SubtitleOverlay(QWidget):
 
     # ---- content ---------------------------------------------------------------------
 
-    def show_entries(self, entries: list[Entry]) -> None:
-        self._entries = entries[-self.cfg.lines:]
+    def show_entries(self, entries: list[Entry], live: Entry | None = None) -> None:
+        keep = self.cfg.lines - 1 if live is not None else self.cfg.lines
+        self._entries = entries[-max(keep, 1):] if keep > 0 else []
+        self._live = live
         self._faded = False
-        self._render()
+        self._render(animate=True)
         self._fade_timer.start(int(self.cfg.hide_after_s * 1000))
 
     def clear(self) -> None:
         self._entries = []
+        self._live = None
         self._render()
 
     def _fade(self) -> None:
         self._faded = True
         self._render()
 
-    def _render(self) -> None:
-        shown = [] if self._faded else self._entries
+    def _render(self, animate: bool = False) -> None:
+        shown = [] if self._faded else list(self._entries)
+        if self._live is not None and not self._faded:
+            shown.append(self._live)
         pad = len(self._labels) - len(shown)
         for i, (orig, trans) in enumerate(self._labels):
             e = shown[i - pad] if i >= pad else None
             if e is None:
                 orig.hide(); trans.hide()
                 continue
+            live = e is self._live
             orig.setFont(theme.ui_font(self.cfg.font_size * 0.62, language=e.language))
             orig.setText(e.text)
             orig.setVisible(self.cfg.show_original and e.state not in ("same", "off"))
@@ -130,8 +151,28 @@ class SubtitleOverlay(QWidget):
                 trans.setText(e.text)
             else:
                 trans.setText("…")
+            trans.setStyleSheet("color: rgba(255,255,255,0.72);" if live else "color: #ffffff;")
             trans.show()
+        self._place_body(animate)
         self.update()
+
+    def _place_body(self, animate: bool) -> None:
+        old_h = self._body.height()
+        w = max(100, self.width() - 48)
+        self._body.setFixedWidth(w)
+        h = self._body.layout().totalHeightForWidth(w)
+        self._body.setFixedHeight(max(h, 0))
+        target = QPoint(24, self.height() - h - 14)
+        if animate and self.isVisible() and h > old_h and old_h > 0:
+            # New text appeared below: start where the old block was and slide up.
+            self._slide.stop()
+            self._slide.setStartValue(QPoint(24, target.y() + (h - old_h)))
+            self._slide.setEndValue(target)
+            self._slide.start()
+        elif self._slide.state() != QPropertyAnimation.State.Running:
+            self._body.move(target)
+        else:
+            self._slide.setEndValue(target)
 
     # ---- painting --------------------------------------------------------------------
 
@@ -141,8 +182,9 @@ class SubtitleOverlay(QWidget):
         visible = [w for pair in self._labels for w in pair if w.isVisible()]
         if visible:
             box = QRect()
+            off = self._body.pos()
             for w in visible:
-                box = box.united(w.geometry())
+                box = box.united(w.geometry().translated(off))
             box = box.adjusted(-18, -10, 18, 10).intersected(self.rect())
             # shrink to the text width so the backdrop hugs the subtitles
             text_w = max(w.fontMetrics().boundingRect(
@@ -162,6 +204,7 @@ class SubtitleOverlay(QWidget):
     def resizeEvent(self, ev) -> None:
         self.grip.move(self.width() - self.grip.width() - 4, self.height() - self.grip.height() - 4)
         super().resizeEvent(ev)
+        self._place_body(animate=False)
 
     # ---- dragging --------------------------------------------------------------------
 
