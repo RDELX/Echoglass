@@ -21,8 +21,8 @@ class OpenAICompatTranslator(Translator):
         self.label = f"{label} ({model})"
 
     def translate(self, text: str, source: str | None, target: str,
-                  context: list[ContextLine]) -> str:
-        system, user = llm_prompt(text, source, target, context)
+                  context: list[ContextLine], kind: str = "speech") -> str:
+        system, user = llm_prompt(text, source, target, context, kind)
         kwargs = dict(
             model=self.model,
             messages=[{"role": "system", "content": system},

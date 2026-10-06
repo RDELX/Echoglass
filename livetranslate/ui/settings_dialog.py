@@ -2,8 +2,11 @@
 
 import copy
 import json
+import os
+import sys
 import threading
 import urllib.request
+from pathlib import Path
 
 from PyQt6.QtCore import QObject, Qt, pyqtSignal
 from PyQt6.QtWidgets import (QCheckBox, QComboBox, QDialog, QDoubleSpinBox, QFormLayout,
@@ -64,6 +67,16 @@ class _ModelFetcher(QObject):
                          daemon=True).start()
 
 
+def extension_folder() -> Path:
+    """browser-extension/ next to the exe when installed, or in the repo when run from source."""
+    base = Path(sys.executable).parent if getattr(sys, "frozen", False) else Path(__file__).parents[2]
+    return base / "browser-extension"
+
+
+def _open_extension_folder() -> None:
+    os.startfile(extension_folder())
+
+
 class SettingsDialog(QDialog):
     def __init__(self, cfg: Config, parent=None):
         super().__init__(parent)
@@ -77,6 +90,7 @@ class SettingsDialog(QDialog):
         self._fetcher.done.connect(self._fill_models)
 
         tabs = QTabWidget()
+        tabs.addTab(self._general_tab(), "General")
         tabs.addTab(self._translation_tab(), "Translation")
         tabs.addTab(self._speech_tab(), "Speech recognition")
         tabs.addTab(self._overlay_tab(), "Subtitle overlay")
@@ -103,6 +117,32 @@ class SettingsDialog(QDialog):
                            " border: 1px solid #262b35; border-radius: 8px; padding: 5px 8px; }")
 
     # ---- tabs ------------------------------------------------------------------------
+
+    def _general_tab(self) -> QWidget:
+        w = QWidget()
+        form = QFormLayout(w)
+        form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
+        self.close_to_tray = QCheckBox("Closing the window keeps LiveTranslate running in the tray")
+        self.close_to_tray.setChecked(self.cfg.ui.close_to_tray)
+        form.addRow("Window", self.close_to_tray)
+
+        form.addRow(_section("Browser extension"))
+        self.api_enabled = QCheckBox("Allow the LiveTranslate Chrome extension to connect")
+        self.api_enabled.setChecked(self.cfg.api.enabled)
+        form.addRow("", self.api_enabled)
+        self.api_port = QSpinBox()
+        self.api_port.setRange(1024, 65535)
+        self.api_port.setValue(self.cfg.api.port)
+        form.addRow("Port", self.api_port)
+        folder = QPushButton("Open extension folder")
+        folder.setObjectName("ghost")
+        folder.clicked.connect(_open_extension_folder)
+        form.addRow("", folder)
+        form.addRow(_note("To install: open chrome://extensions, turn on Developer mode, click "
+                          "“Load unpacked” and choose the extension folder. Only that extension "
+                          "can talk to the app, and only from this PC. If you change the port, "
+                          "set the same port in the extension's popup."))
+        return w
 
     def _translation_tab(self) -> QWidget:
         t = self.cfg.translation
@@ -272,6 +312,10 @@ class SettingsDialog(QDialog):
         cfg.vad.soft_max_s = self.max_len.value()
         cfg.vad.hard_max_s = max(cfg.vad.soft_max_s + 4, 15.0)
         cfg.vad.min_silence_ms = self.pause.value()
+
+        cfg.ui.close_to_tray = self.close_to_tray.isChecked()
+        cfg.api.enabled = self.api_enabled.isChecked()
+        cfg.api.port = self.api_port.value()
 
         o = cfg.overlay
         o.font_size = self.ov_font.value()

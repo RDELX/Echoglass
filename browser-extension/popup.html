@@ -1,0 +1,45 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header>
+    <img src="icons/icon32.png" alt="">
+    <h1>LiveTranslate</h1>
+    <span id="conn" class="conn">Connecting…</span>
+  </header>
+
+  <section id="controls" class="row" hidden>
+    <button id="live" class="primary">Start live translation</button>
+    <button id="overlay" class="secondary">Overlay</button>
+  </section>
+
+  <section class="card">
+    <textarea id="text" rows="4" placeholder="Type or paste text to translate"></textarea>
+    <div class="row">
+      <label for="target">To</label>
+      <select id="target"></select>
+      <button id="go" class="primary small">Translate</button>
+    </div>
+    <div id="out" class="out" hidden>
+      <p id="result"></p>
+      <button id="copy" class="ghost">Copy</button>
+    </div>
+  </section>
+
+  <p class="hint">Tip: select text on any page, right-click → <b>Translate with LiveTranslate</b>
+    (or press <kbd>Alt</kbd>+<kbd>T</kbd>). Alt+click translated text to restore the original.</p>
+
+  <details>
+    <summary>Connection</summary>
+    <div class="row">
+      <label for="port">App port</label>
+      <input id="port" type="number" min="1024" max="65535">
+    </div>
+  </details>
+
+  <script type="module" src="popup.js"></script>
+</body>
+</html>

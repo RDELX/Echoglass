@@ -14,8 +14,8 @@ class ClaudeTranslator(Translator):
         self.label = f"Claude ({model})"
 
     def translate(self, text: str, source: str | None, target: str,
-                  context: list[ContextLine]) -> str:
-        system, user = llm_prompt(text, source, target, context)
+                  context: list[ContextLine], kind: str = "speech") -> str:
+        system, user = llm_prompt(text, source, target, context, kind)
         resp = self.client.beta.messages.create(
             model=self.model,
             max_tokens=2000,

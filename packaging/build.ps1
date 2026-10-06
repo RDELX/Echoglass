@@ -10,6 +10,12 @@ Write-Host "Building LiveTranslate $version"
 
 & "$root\.venv\Scripts\pyinstaller.exe" --noconfirm --clean --distpath "$root\dist" --workpath "$root\build" "$root\packaging\LiveTranslate.spec"
 if ($LASTEXITCODE -ne 0) { throw "PyInstaller failed" }
+# The Chrome extension ships next to the exe for "Load unpacked" (Settings > General opens it).
+$ext = "$root\dist\LiveTranslate\browser-extension"
+Remove-Item $ext -Recurse -Force -ErrorAction SilentlyContinue
+Copy-Item "$root\browser-extension" $ext -Recurse
+$manifest = (Get-Content "$root\browser-extension\manifest.json" -Raw) -replace '"version": "[^"]+"', "`"version`": `"$version`""
+[IO.File]::WriteAllText("$ext\manifest.json", $manifest, (New-Object Text.UTF8Encoding $false))  # no BOM
 
 $iscc = @("$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe", "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe", "$env:ProgramFiles\Inno Setup 6\ISCC.exe") |
     Where-Object { Test-Path $_ } | Select-Object -First 1

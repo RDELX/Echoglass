@@ -1,0 +1,22 @@
+{
+  "manifest_version": 3,
+  "name": "LiveTranslate",
+  "version": "0.5.0",
+  "description": "Translate selected text in place with the LiveTranslate desktop app, and control live translation from your browser.",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAkG+BUgdxsMBSzzVC3y36N6egh9FezJ3XnpjXqRgthVRgfbkViduLSiHaEizbBhYP0npTUYNT2qU+BGfcse0niche72ZRZrmCTPm+8RUkW09YlW4C3Bwrc2I0jWL9iiG+cokpYmcbVLyn6wkJPNVwMH1lqvq2EePUgUQTNGFgy/7eUWT0L18E8liCthI4s1SWS+MJ2CMUyHSzS5mJnedj9FTb2x1XHb8AQjxZ7MsLK20XlvMY5DMGatQ8UsbYfdRzwoO153BXqRqCPg20z6xrRKKEoU6nc2XdiZwbkZjPDKAoRJfVERIgJskK2x//jioONkZpWmWBRWBbh/tpRw3SRwIDAQAB",
+  "permissions": ["contextMenus", "scripting", "activeTab", "storage"],
+  "host_permissions": ["http://127.0.0.1/*"],
+  "background": { "service_worker": "background.js", "type": "module" },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "LiveTranslate",
+    "default_icon": { "16": "icons/icon16.png", "32": "icons/icon32.png", "48": "icons/icon48.png" }
+  },
+  "icons": { "16": "icons/icon16.png", "32": "icons/icon32.png", "48": "icons/icon48.png", "128": "icons/icon128.png" },
+  "commands": {
+    "translate-selection": {
+      "suggested_key": { "default": "Alt+T" },
+      "description": "Translate the selected text in place"
+    }
+  }
+}

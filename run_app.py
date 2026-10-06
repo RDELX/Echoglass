@@ -36,6 +36,7 @@ def main() -> None:
 
     app = QApplication(sys.argv)
     app.setApplicationName("LiveTranslate")
+    app.setQuitOnLastWindowClosed(False)  # closing the window hides it to the tray
     app.setWindowIcon(QIcon(str(theme.ASSETS / "icon.png")))
     theme.apply(app)
     win = MainWindow(settings.load())
@@ -62,7 +63,7 @@ def _selftest(win, wav_path: str) -> None:
     if "--music" in sys.argv:
         win.cfg.music_mode = True
     QTimer.singleShot(500, win._toggle_running)
-    QTimer.singleShot(90_000, win.close)
+    QTimer.singleShot(90_000, win.quit_app)
 
 
 if __name__ == "__main__":

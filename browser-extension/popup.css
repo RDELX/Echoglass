@@ -1,0 +1,55 @@
+:root {
+  --bg: #0e1014; --surface: #15181e; --surface-2: #1c2028; --border: #262b35;
+  --text: #e7e9ee; --muted: #7c8495; --accent: #8b9cff; --accent-dim: #2a2f52;
+  --live: #3ddc97; --error: #ff6b6b;
+}
+* { box-sizing: border-box; }
+body {
+  width: 340px; margin: 0; padding: 14px; background: var(--bg); color: var(--text);
+  font: 13px/1.45 "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+}
+header { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+header img { width: 20px; height: 20px; }
+h1 { font-size: 15px; font-weight: 600; margin: 0; flex: 1; }
+.conn { font-size: 11.5px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+.conn::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--muted); }
+.conn.ok::before { background: var(--live); }
+.conn.bad { color: var(--error); }
+.conn.bad::before { background: var(--error); }
+
+.row { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+section.row { margin: 0 0 12px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 10px; }
+
+button {
+  font: inherit; color: var(--text); background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 8px; padding: 7px 12px; cursor: pointer;
+}
+button:hover { background: #252a34; }
+button.primary { background: var(--accent); color: #10132a; border: none; font-weight: 600; flex: 1; }
+button.primary:hover { background: #a3b1ff; }
+button.primary.running { background: var(--surface-2); color: var(--text); border: 1px solid var(--border); }
+button.secondary.on { background: var(--accent-dim); border-color: var(--accent); color: #dfe3ff; }
+button.small { flex: 0 0 auto; padding: 6px 14px; }
+button.ghost { background: transparent; border-color: transparent; color: var(--muted); padding: 3px 8px; font-size: 12px; }
+button.ghost:hover { color: var(--text); border-color: var(--border); }
+button:disabled { opacity: .5; cursor: default; }
+
+textarea, select, input {
+  font: inherit; color: var(--text); background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 8px; padding: 7px 9px; outline: none;
+}
+textarea { width: 100%; resize: vertical; }
+textarea:focus, select:focus, input:focus { border-color: var(--accent); }
+select { flex: 1; }
+label { color: var(--muted); font-size: 12px; }
+
+.out { margin-top: 10px; border-top: 1px solid var(--border); padding-top: 8px; display: flex; gap: 6px; align-items: flex-start; }
+.out p { margin: 0; flex: 1; white-space: pre-wrap; }
+.out.error p { color: var(--error); }
+
+.hint { color: var(--muted); font-size: 12px; margin: 12px 2px 8px; }
+kbd { background: var(--surface-2); border: 1px solid var(--border); border-radius: 4px; padding: 0 4px; font-size: 11px; }
+details { color: var(--muted); font-size: 12px; }
+summary { cursor: pointer; }
+details input { width: 100px; }

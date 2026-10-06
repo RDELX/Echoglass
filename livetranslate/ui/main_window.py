@@ -2,12 +2,14 @@
 
 from collections import deque
 
-from PyQt6.QtCore import QByteArray, Qt
-from PyQt6.QtGui import QKeySequence, QShortcut
-from PyQt6.QtWidgets import (QButtonGroup, QComboBox, QHBoxLayout, QLabel, QMainWindow,
+from PyQt6.QtCore import QByteArray, QObject, Qt, pyqtSignal
+from PyQt6.QtGui import QAction, QIcon, QKeySequence, QShortcut
+from PyQt6.QtWidgets import (QApplication, QButtonGroup, QComboBox, QHBoxLayout, QLabel, QMainWindow,
+                             QMenu, QSystemTrayIcon,
                              QPushButton, QVBoxLayout, QWidget)
 
 from .. import settings
+from ..api_server import ApiServer
 from ..audio import list_loopback_devices
 from ..config import Config
 from ..translation.languages import LANGUAGES
@@ -27,6 +29,12 @@ BACKEND_LABELS = [
 ]
 
 STATUS_COLORS = {"idle": theme.MUTED, "busy": theme.WARN, "live": theme.LIVE, "error": theme.ERROR}
+
+
+class _ApiBridge(QObject):
+    """Carries extension requests from API server threads onto the UI thread."""
+    live = pyqtSignal(str)
+    overlay = pyqtSignal(object)
 
 
 def _labelled(label: str, widget: QWidget) -> QWidget:
@@ -87,6 +95,64 @@ class MainWindow(QMainWindow):
         QShortcut(QKeySequence("Ctrl+O"), self, activated=self.overlay_btn.toggle)
 
         self._on_status("Ready", "idle")
+        self._quitting = False
+        self._build_tray()
+
+        self._bridge = _ApiBridge()
+        self._bridge.live.connect(self._api_live)
+        self._bridge.overlay.connect(self._api_overlay)
+        self.api = ApiServer(cfg, status=self._api_status, live=self._bridge.live.emit,
+                             overlay=self._bridge.overlay.emit)
+        if cfg.api.enabled:
+            self.api.start()
+
+    # ---- tray ------------------------------------------------------------------------
+
+    def _build_tray(self) -> None:
+        self.tray = QSystemTrayIcon(QIcon(str(theme.ASSETS / "icon.png")), self)
+        self.tray.setToolTip("LiveTranslate")
+        menu = QMenu()
+        menu.addAction("Show LiveTranslate", self._show_window)
+        self.tray_start = menu.addAction("Start live translation", self._toggle_running)
+        self.tray_overlay = QAction("Subtitle overlay", menu, checkable=True)
+        self.tray_overlay.toggled.connect(self.overlay_btn.setChecked)
+        self.overlay_btn.toggled.connect(self.tray_overlay.setChecked)
+        menu.addAction(self.tray_overlay)
+        menu.addSeparator()
+        menu.addAction("Quit", self.quit_app)
+        self.tray.setContextMenu(menu)
+        self._tray_menu = menu
+        self.tray.activated.connect(
+            lambda reason: self._show_window()
+            if reason in (QSystemTrayIcon.ActivationReason.Trigger,
+                          QSystemTrayIcon.ActivationReason.DoubleClick) else None)
+        self.tray.show()
+
+    def _show_window(self) -> None:
+        self.showNormal()
+        self.raise_()
+        self.activateWindow()
+
+    def quit_app(self) -> None:
+        self._quitting = True
+        self.close()
+
+    # ---- browser extension API (UI thread side) ---------------------------------------
+
+    def _api_status(self) -> dict:
+        # Called from a server thread: only read plain attributes.
+        t = self.cfg.translation
+        return {"running": self.engine.running, "busy": self.engine.busy,
+                "source": self.cfg.asr.language, "target": t.target_language,
+                "translator": t.backend, "overlay": self.cfg.ui.overlay_visible,
+                "music_mode": self.cfg.music_mode}
+
+    def _api_live(self, action: str) -> None:
+        if action == "toggle" or (action == "start") != self.engine.running:
+            self._toggle_running()
+
+    def _api_overlay(self, visible) -> None:
+        self.overlay_btn.setChecked(not self.overlay_btn.isChecked() if visible is None else visible)
 
     # ---- layout ----------------------------------------------------------------------
 
@@ -265,8 +331,15 @@ class MainWindow(QMainWindow):
             return
         new = dlg.result_cfg
         restart_needed = (new.asr.model != self.cfg.asr.model or new.vad != self.cfg.vad)
-        for section in ("asr", "vad", "translation", "overlay"):
+        api_changed = new.api != self.cfg.api
+        for section in ("asr", "vad", "translation", "overlay", "api"):
             setattr(self.cfg, section, getattr(new, section))
+        self.cfg.ui.close_to_tray = new.ui.close_to_tray
+        self.api.cfg = self.cfg
+        if api_changed:
+            self.api.stop()
+            if self.cfg.api.enabled:
+                self.api.start()
         self.overlay.cfg = self.cfg.overlay
         self.overlay.apply_config()
         self.engine.cfg = self.cfg
@@ -328,6 +401,8 @@ class MainWindow(QMainWindow):
             self.start_btn.setEnabled(True)
 
     def _on_running(self, running: bool) -> None:
+        self.tray_start.setText("Stop live translation" if running else "Start live translation")
+        self.tray.setToolTip("LiveTranslate · live" if running else "LiveTranslate")
         self.start_btn.setText("Stop" if running else "Start")
         self.start_btn.setProperty("running", running)
         self.start_btn.style().unpolish(self.start_btn)
@@ -359,8 +434,21 @@ class MainWindow(QMainWindow):
             self._on_status(f"Translation failed: {r.error}", "error")
 
     def closeEvent(self, ev) -> None:
+        if self.cfg.ui.close_to_tray and not self._quitting and QSystemTrayIcon.isSystemTrayAvailable():
+            ev.ignore()
+            self.hide()
+            self._save_settings()
+            if not self.cfg.ui.tray_hint_shown:
+                self.cfg.ui.tray_hint_shown = True
+                self.tray.showMessage("LiveTranslate is still running",
+                                      "It's in the system tray. Right-click the icon to quit.",
+                                      QSystemTrayIcon.MessageIcon.Information, 4000)
+            return
         self._save_settings()
+        self.api.stop()
         self.overlay.close()
+        self.tray.hide()
         self.hide()
         self.engine.shutdown()
         super().closeEvent(ev)
+        QApplication.quit()

@@ -63,6 +63,15 @@ class UiConfig:
     font_size: float = 13.0
     window_geometry: str | None = None  # Qt saveGeometry(), base64
     overlay_visible: bool = False
+    close_to_tray: bool = True      # the window's X hides to the system tray
+    tray_hint_shown: bool = False
+
+
+@dataclass
+class ApiConfig:
+    """Local HTTP API used by the browser extension (127.0.0.1 only)."""
+    enabled: bool = True
+    port: int = 47821
 
 
 @dataclass
@@ -72,6 +81,7 @@ class Config:
     translation: TranslationConfig
     overlay: OverlayConfig = field(default_factory=OverlayConfig)
     ui: UiConfig = field(default_factory=UiConfig)
+    api: ApiConfig = field(default_factory=ApiConfig)
     device_index: int | None = None  # None = loopback of the default output device
     device_name: str | None = None   # saved instead of the index, which can change
     music_mode: bool = False         # isolate vocals with Demucs first (songs, loud BGM)
