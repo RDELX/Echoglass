@@ -19,6 +19,8 @@ from .overlay import SubtitleOverlay
 from .settings_dialog import SettingsDialog
 from .transcript_view import Entry, TranscriptView
 from .update_banner import UpdateBanner
+from ..screen.controller import ScreenTranslator
+from ..screen.region_picker import RegionPicker
 from .. import updater
 
 BACKEND_LABELS = [
@@ -61,8 +63,8 @@ class MainWindow(QMainWindow):
         self.overlay.set_target_language(cfg.translation.target_language)
 
         self.setWindowTitle("LiveTranslate")
-        self.resize(1180, 720)
-        self.setMinimumSize(860, 520)
+        self.resize(1320, 740)
+        self.setMinimumSize(1240, 560)
 
         root = QWidget()
         root.setObjectName("root")
@@ -104,9 +106,12 @@ class MainWindow(QMainWindow):
         QShortcut(QKeySequence("Ctrl+-"), self, activated=lambda: self.view.change_font_size(-1))
         QShortcut(QKeySequence("Ctrl+L"), self, activated=self.view_clear)
         QShortcut(QKeySequence("Ctrl+O"), self, activated=self.overlay_btn.toggle)
+        QShortcut(QKeySequence("Ctrl+Shift+S"), self, activated=self.screen_btn.toggle)
 
         self._on_status("Ready", "idle")
         self._quitting = False
+        self.screen = ScreenTranslator(cfg)
+        self.screen.status.connect(self._on_status)
         self._build_tray()
 
         self._bridge = _ApiBridge()
@@ -131,6 +136,11 @@ class MainWindow(QMainWindow):
         self.tray_overlay.toggled.connect(self.overlay_btn.setChecked)
         self.overlay_btn.toggled.connect(self.tray_overlay.setChecked)
         menu.addAction(self.tray_overlay)
+        self.tray_screen = QAction("Screen text translation", menu, checkable=True)
+        self.tray_screen.toggled.connect(self.screen_btn.setChecked)
+        self.screen_btn.toggled.connect(self.tray_screen.setChecked)
+        menu.addAction(self.tray_screen)
+        menu.addAction("Choose screen area…", self._pick_screen_area)
         menu.addSeparator()
         menu.addAction("Check for updates", lambda: (self._show_window(),
                                                       self.update_banner.check(manual=True)))
@@ -153,6 +163,7 @@ class MainWindow(QMainWindow):
         self._quitting = True
         self._save_settings()
         self.api.stop()
+        self.screen.stop()
         self.overlay.close()
         self.tray.hide()
         self.hide()
@@ -191,6 +202,7 @@ class MainWindow(QMainWindow):
         bar.addSpacing(18)
 
         self.source = QComboBox()
+        self.source.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
         self.source.addItem("Auto-detect", None)
         for code, (label, *_ ) in LANGUAGES.items():
             self.source.addItem(label, code)
@@ -201,6 +213,7 @@ class MainWindow(QMainWindow):
             lambda: self.engine.set_source_language(self.source.currentData()))
 
         self.target = QComboBox()
+        self.target.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
         for code, (label, *_ ) in LANGUAGES.items():
             self.target.addItem(label, code)
         self.target.setCurrentIndex(self.target.findData(self.cfg.translation.target_language))
@@ -214,6 +227,7 @@ class MainWindow(QMainWindow):
         bar.addSpacing(10)
 
         self.backend = QComboBox()
+        self.backend.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
         for key, label in BACKEND_LABELS:
             self.backend.addItem(label, key)
         self.backend.setCurrentIndex(self.backend.findData(self.cfg.translation.backend))
@@ -245,6 +259,19 @@ class MainWindow(QMainWindow):
         self.overlay_btn.toggled.connect(self._on_overlay_toggled)
         bar.addWidget(self.overlay_btn, 0, Qt.AlignmentFlag.AlignBottom)
 
+        self.screen_btn = QPushButton("⛶  Screen text")
+        self.screen_btn.setObjectName("pill")
+        self.screen_btn.setCheckable(True)
+        self.screen_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.screen_btn.setToolTip("Translate text on screen (e.g. a live chat) with an overlay on top of it.\n"
+                                   "The first time, drag a box around the text. Ctrl+Shift+S")
+        self.screen_btn.toggled.connect(self._on_screen_toggled)
+        self.area_btn = QPushButton("Area…")
+        self.area_btn.setObjectName("ghost")
+        self.area_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.area_btn.setToolTip("Choose a different screen area to translate")
+        self.area_btn.clicked.connect(self._pick_screen_area)
+
         self.lock_btn = QPushButton("Lock")
         self.lock_btn.setObjectName("pill")
         self.lock_btn.setCheckable(True)
@@ -253,6 +280,9 @@ class MainWindow(QMainWindow):
                                  "Unlock to move or resize them.")
         self.lock_btn.toggled.connect(self._on_lock_toggled)
         bar.addWidget(self.lock_btn, 0, Qt.AlignmentFlag.AlignBottom)
+        bar.addSpacing(6)
+        bar.addWidget(self.screen_btn, 0, Qt.AlignmentFlag.AlignBottom)
+        bar.addWidget(self.area_btn, 0, Qt.AlignmentFlag.AlignBottom)
 
         settings_btn = QPushButton("Settings")
         settings_btn.setObjectName("pill")
@@ -347,6 +377,37 @@ class MainWindow(QMainWindow):
         else:
             self.overlay.hide()
 
+    # ---- screen text ---------------------------------------------------------------
+
+    def _pick_screen_area(self) -> None:
+        was_visible = self.isVisible()
+        self.hide()  # don't cover what the user wants to select
+        QApplication.processEvents()
+        r = RegionPicker.pick()
+        if was_visible:
+            self.show()
+        if r is None:
+            return
+        self.cfg.screen.region = [r.x(), r.y(), r.width(), r.height()]
+        if self.screen.running:
+            self.screen.start(r)
+        else:
+            self.screen_btn.setChecked(True)
+
+    def _on_screen_toggled(self, on: bool) -> None:
+        if not on:
+            self.screen.stop()
+            self._on_status("Screen text off", "idle")
+            return
+        if not self.cfg.screen.region:
+            self.screen_btn.blockSignals(True)
+            self.screen_btn.setChecked(False)
+            self.screen_btn.blockSignals(False)
+            self._pick_screen_area()
+            return
+        from PyQt6.QtCore import QRect
+        self.screen.start(QRect(*self.cfg.screen.region))
+
     def _on_lock_toggled(self, locked: bool) -> None:
         self.lock_btn.setText("Locked" if locked else "Lock")
         self.overlay.set_locked(locked)
@@ -411,6 +472,7 @@ class MainWindow(QMainWindow):
     def _on_target_changed(self) -> None:
         code = self.target.currentData()
         self.engine.set_target_language(code)
+        self.screen.set_target_language(code)
         self.view.set_target_language(code)
         self.overlay.set_target_language(code)
 
@@ -506,6 +568,7 @@ class MainWindow(QMainWindow):
             return
         self._save_settings()
         self.api.stop()
+        self.screen.stop()
         self.overlay.close()
         self.tray.hide()
         self.hide()

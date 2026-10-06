@@ -78,6 +78,14 @@ class ApiConfig:
 
 
 @dataclass
+class ScreenConfig:
+    """Screen text translation (OCR of a screen region, e.g. a stream's chat)."""
+    region: list[int] | None = None  # x, y, w, h in global screen coordinates
+    interval_ms: int = 600           # how often the region is read (OCR takes ~0.2 s)
+    opacity: float = 0.88            # backdrop behind each translated line
+
+
+@dataclass
 class Config:
     asr: AsrConfig
     vad: VadConfig
@@ -85,6 +93,7 @@ class Config:
     overlay: OverlayConfig = field(default_factory=OverlayConfig)
     ui: UiConfig = field(default_factory=UiConfig)
     api: ApiConfig = field(default_factory=ApiConfig)
+    screen: ScreenConfig = field(default_factory=ScreenConfig)
     device_index: int | None = None  # None = loopback of the default output device
     device_name: str | None = None   # saved instead of the index, which can change
     music_mode: bool = False         # isolate vocals with Demucs first (songs, loud BGM)

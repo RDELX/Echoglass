@@ -6,8 +6,8 @@ import logging
 import os
 from pathlib import Path
 
-from .config import (ApiConfig, AsrConfig, Config, OverlayConfig, TranslationConfig, UiConfig,
-                     VadConfig)
+from .config import (ApiConfig, AsrConfig, Config, OverlayConfig, ScreenConfig, TranslationConfig,
+                     UiConfig, VadConfig)
 
 log = logging.getLogger(__name__)
 
@@ -45,6 +45,7 @@ def load() -> Config:
                 overlay=_fill(OverlayConfig, data.get("overlay", {})),
                 ui=_fill(UiConfig, data.get("ui", {})),
                 api=_fill(ApiConfig, data.get("api", {})),
+                screen=_fill(ScreenConfig, data.get("screen", {})),
                 device_name=data.get("device_name"),
                 music_mode=data.get("music_mode", False),
             )

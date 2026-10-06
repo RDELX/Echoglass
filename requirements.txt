@@ -21,3 +21,6 @@ PyQt6
 
 # Stage 4: API keys in Windows Credential Manager
 keyring
+
+# Screen text translation (OCR)
+rapidocr

@@ -6,7 +6,8 @@ from PyInstaller.utils.hooks import collect_all, collect_data_files, collect_dyn
 ROOT = SPECPATH + "\\.."
 
 datas, binaries, hiddenimports = [], [], []
-for pkg in ("faster_whisper", "ctranslate2", "pysilero_vad", "demucs", "pyaudiowpatch", "soxr"):
+for pkg in ("faster_whisper", "ctranslate2", "pysilero_vad", "demucs", "pyaudiowpatch", "soxr",
+            "rapidocr", "pyclipper", "shapely", "omegaconf"):
     d, b, h = collect_all(pkg)
     datas += d; binaries += b; hiddenimports += h
 
