@@ -44,5 +44,9 @@ Filename: "{app}\LiveTranslate.exe"; Description: "Launch LiveTranslate"; Flags:
 ; In-app updates run the installer with /SILENT: relaunch the app when it finishes.
 Filename: "{app}\LiveTranslate.exe"; Flags: nowait skipifnotsilent
 
+[UninstallDelete]
+; In-app partial updates add files the uninstaller's own list doesn't know about.
+Type: filesandordirs; Name: "{app}"
+
 ; Settings (%APPDATA%\LiveTranslate) and downloaded models (%USERPROFILE%\.cache\huggingface)
 ; are kept on uninstall so a reinstall doesn't re-download 3 GB.

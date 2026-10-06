@@ -83,8 +83,10 @@ class UpdateBanner(QFrame):
                 self._message(f"You're on the latest version ({__version__}).", hide_after=True)
             return
         self.release = rel
+        size = (f"{rel.size / 1e6:.0f} MB" if rel.size < 1e9 else f"{rel.size / 1e9:.1f} GB")
+        kind = "quick update" if rel.patch else "full installer"
         self.text.setText(f"LiveTranslate {rel.version} is available (you have {__version__}). "
-                          f"Download: {rel.size / 1e9:.1f} GB.")
+                          f"Download: {size}, {kind}.")
         self.update_btn.setVisible(updater.can_self_update())
         self.update_btn.setEnabled(True)
         self.notes_btn.show()
@@ -127,14 +129,15 @@ class UpdateBanner(QFrame):
         self.bar.setMaximum(1000)
         self.bar.setValue(int(done / max(total, 1) * 1000))
         self.text.setText(f"Downloading LiveTranslate {self.release.version}… "
-                          f"{done / 1e9:.2f} / {total / 1e9:.2f} GB")
+                          f"{done / 1e6:.0f} / {total / 1e6:.0f} MB")
 
     def _on_downloaded(self, path) -> None:
         self.text.setText("Installing the update. LiveTranslate will restart by itself.")
         self.bar.setMaximum(0)  # busy indicator
         self.later_btn.hide()
+        QApplication.processEvents()
         self.before_install()
-        updater.install(path)
+        updater.install(path, self.release.version)
         QApplication.quit()
 
     def _later(self) -> None:
