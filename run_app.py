@@ -33,6 +33,8 @@ def main() -> None:
                   logging.StreamHandler()])
     for noisy in ("httpx", "httpx2", "openai", "anthropic", "faster_whisper", "huggingface_hub"):
         logging.getLogger(noisy).setLevel(logging.WARNING)
+    # Without a console, uncaught errors would vanish: put them in log.txt.
+    sys.excepthook = lambda *exc: logging.getLogger("crash").error("Uncaught exception", exc_info=exc)
 
     app = QApplication(sys.argv)
     app.setApplicationName("LiveTranslate")
