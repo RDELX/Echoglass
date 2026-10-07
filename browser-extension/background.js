@@ -5,7 +5,7 @@ const MENU_ID = "lt-translate-selection";
 chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.create({
     id: MENU_ID,
-    title: "Translate with LiveTranslate",
+    title: "Translate with Echoglass",
     contexts: ["selection"],
   });
 });
@@ -38,7 +38,7 @@ async function translateInPlace(tabId, frameId) {
     text = await run(tabId, frameId, captureSelection);
   } catch (e) {
     // e.g. chrome:// pages or the Web Store, where extensions can't run
-    console.warn("LiveTranslate: can't access this page", e);
+    console.warn("Echoglass: can't access this page", e);
     return;
   }
   if (!text) return;
@@ -129,7 +129,7 @@ function applyTranslation(translation) {
 function showError(message) {
   window.__ltTarget = null;
   let t = document.getElementById("__lt_toast");
-  if (!t) return alert(`LiveTranslate: ${message}`);
+  if (!t) return alert(`Echoglass: ${message}`);
   t.textContent = message;
   t.style.borderColor = "#ff6b6b";
   setTimeout(() => t.remove(), 5000);

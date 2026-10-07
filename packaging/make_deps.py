@@ -24,14 +24,14 @@ def wheel(pkg: str) -> dict:
     version = md.version(pkg)                     # e.g. 2.11.0+cu128
     local = version.split("+")[1]                 # cu128
     index = f"https://download.pytorch.org/whl/{local}/{pkg}/"
-    ua = {"User-Agent": "Mozilla/5.0 LiveTranslate-build"}
+    ua = {"User-Agent": "Mozilla/5.0 Echoglass-build"}
     html = urllib.request.urlopen(urllib.request.Request(index, headers=ua), timeout=30).read().decode()
     name = f"{pkg}-{version.replace('+', '%2B')}-{PY_TAG}-{PY_TAG}-win_amd64.whl"
     m = re.search(r'href="([^"#]*' + re.escape(name) + r')#sha256=([0-9a-f]{64})"', html)
     if not m:
         raise SystemExit(f"{name} not found on {index}")
     url, sha = m.group(1), m.group(2)
-    req = urllib.request.Request(url, method="HEAD", headers={"User-Agent": "Mozilla/5.0 LiveTranslate-build"})
+    req = urllib.request.Request(url, method="HEAD", headers={"User-Agent": "Mozilla/5.0 Echoglass-build"})
     size = int(urllib.request.urlopen(req, timeout=30).headers["Content-Length"])
     dist_info = f"{pkg}-{version}.dist-info"
     return {"pkg": pkg, "version": version, "url": url, "sha256": sha, "size": size,

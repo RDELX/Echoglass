@@ -21,8 +21,8 @@ def ensure_model(size_or_id: str, on_progress: Callable[[float, float], None] | 
     `on_progress(done_bytes, total_bytes)` is called during a download.
     """
     repo = size_or_id if "/" in size_or_id else _MODELS.get(size_or_id, size_or_id)
-    # The installer can pre-download a model here (%LOCALAPPDATA%\LiveTranslate\models).
-    local = Path(os.environ.get("LOCALAPPDATA", Path.home())) / "LiveTranslate" / "models" / repo.split("/")[-1]
+    # The installer can pre-download a model here (%LOCALAPPDATA%\Echoglass\models).
+    local = Path(os.environ.get("LOCALAPPDATA", Path.home())) / "Echoglass" / "models" / repo.split("/")[-1]
     if (local / "model.bin").exists() and (local / "tokenizer.json").exists():
         return str(local)
     try:

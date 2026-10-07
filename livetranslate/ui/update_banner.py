@@ -85,7 +85,7 @@ class UpdateBanner(QFrame):
         self.release = rel
         size = (f"{rel.size / 1e6:.0f} MB" if rel.size < 1e9 else f"{rel.size / 1e9:.1f} GB")
         kind = "quick update" if rel.patch else "full installer"
-        self.text.setText(f"LiveTranslate {rel.version} is available (you have {__version__}). "
+        self.text.setText(f"Echoglass {rel.version} is available (you have {__version__}). "
                           f"Download: {size}, {kind}.")
         self.update_btn.setVisible(updater.can_self_update())
         self.update_btn.setEnabled(True)
@@ -128,11 +128,11 @@ class UpdateBanner(QFrame):
     def _on_progress(self, done: int, total: int) -> None:
         self.bar.setMaximum(1000)
         self.bar.setValue(int(done / max(total, 1) * 1000))
-        self.text.setText(f"Downloading LiveTranslate {self.release.version}… "
+        self.text.setText(f"Downloading Echoglass {self.release.version}… "
                           f"{done / 1e6:.0f} / {total / 1e6:.0f} MB")
 
     def _on_downloaded(self, path) -> None:
-        self.text.setText("Installing the update. LiveTranslate will restart by itself.")
+        self.text.setText("Installing the update. Echoglass will restart by itself.")
         self.bar.setMaximum(0)  # busy indicator
         self.later_btn.hide()
         QApplication.processEvents()

@@ -27,7 +27,7 @@ class SubtitleOverlay(QWidget):
         self._drag_from: QPoint | None = None
         self._faded = True
 
-        self.setWindowTitle("LiveTranslate subtitles")
+        self.setWindowTitle("Echoglass subtitles")
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)
         self._apply_flags()

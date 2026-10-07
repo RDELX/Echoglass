@@ -1,4 +1,4 @@
-# PyInstaller spec: builds dist\LiveTranslate\LiveTranslate.exe (one-folder, windowed).
+# PyInstaller spec: builds dist\Echoglass\Echoglass.exe (one-folder, windowed).
 # Run via packaging\build.ps1, not directly.
 
 from PyInstaller.utils.hooks import collect_all, collect_data_files, collect_dynamic_libs
@@ -57,9 +57,9 @@ pyz = PYZ(a.pure)
 exe = EXE(
     pyz, a.scripts, [],
     exclude_binaries=True,
-    name="LiveTranslate",
+    name="Echoglass",
     console=False,
     icon=ROOT + "\\packaging\\icon.ico",
     upx=False,
 )
-coll = COLLECT(exe, a.binaries, a.datas, name="LiveTranslate", upx=False)
+coll = COLLECT(exe, a.binaries, a.datas, name="Echoglass", upx=False)

@@ -62,7 +62,7 @@ class MainWindow(QMainWindow):
         self.overlay = SubtitleOverlay(cfg.overlay)
         self.overlay.set_target_language(cfg.translation.target_language)
 
-        self.setWindowTitle("LiveTranslate")
+        self.setWindowTitle("Echoglass")
         self.resize(1320, 740)
         self.setMinimumSize(1240, 560)
 
@@ -128,9 +128,9 @@ class MainWindow(QMainWindow):
 
     def _build_tray(self) -> None:
         self.tray = QSystemTrayIcon(QIcon(str(theme.ASSETS / "icon.png")), self)
-        self.tray.setToolTip("LiveTranslate")
+        self.tray.setToolTip("Echoglass")
         menu = QMenu()
-        menu.addAction("Show LiveTranslate", self._show_window)
+        menu.addAction("Show Echoglass", self._show_window)
         self.tray_start = menu.addAction("Start live translation", self._toggle_running)
         self.tray_overlay = QAction("Subtitle overlay", menu, checkable=True)
         self.tray_overlay.toggled.connect(self.overlay_btn.setChecked)
@@ -196,7 +196,7 @@ class MainWindow(QMainWindow):
         bar = QHBoxLayout()
         bar.setSpacing(10)
 
-        name = QLabel("LiveTranslate")
+        name = QLabel("Echoglass")
         name.setObjectName("appName")
         bar.addWidget(name, 0, Qt.AlignmentFlag.AlignBottom)
         bar.addSpacing(18)
@@ -491,7 +491,7 @@ class MainWindow(QMainWindow):
 
     def _on_running(self, running: bool) -> None:
         self.tray_start.setText("Stop live translation" if running else "Start live translation")
-        self.tray.setToolTip("LiveTranslate · live" if running else "LiveTranslate")
+        self.tray.setToolTip("Echoglass · live" if running else "Echoglass")
         self.start_btn.setText("Stop" if running else "Start")
         self.start_btn.setProperty("running", running)
         self.start_btn.style().unpolish(self.start_btn)
@@ -562,7 +562,7 @@ class MainWindow(QMainWindow):
             self._save_settings()
             if not self.cfg.ui.tray_hint_shown:
                 self.cfg.ui.tray_hint_shown = True
-                self.tray.showMessage("LiveTranslate is still running",
+                self.tray.showMessage("Echoglass is still running",
                                       "It's in the system tray. Right-click the icon to quit.",
                                       QSystemTrayIcon.MessageIcon.Information, 4000)
             return

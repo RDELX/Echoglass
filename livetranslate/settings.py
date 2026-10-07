@@ -1,4 +1,4 @@
-"""Load/save `Config` as JSON in %APPDATA%\\LiveTranslate, with API keys in the OS keyring."""
+"""Load/save `Config` as JSON in %APPDATA%\\Echoglass, with API keys in the OS keyring."""
 
 import dataclasses
 import json
@@ -11,10 +11,13 @@ from .config import (ApiConfig, AsrConfig, Config, OverlayConfig, ScreenConfig, 
 
 log = logging.getLogger(__name__)
 
-SETTINGS_DIR = Path(os.environ.get("APPDATA", Path.home())) / "LiveTranslate"
+SETTINGS_DIR = Path(os.environ.get("APPDATA", Path.home())) / "Echoglass"
 SETTINGS_FILE = SETTINGS_DIR / "settings.json"
 
-KEYRING_SERVICE = "LiveTranslate"
+KEYRING_SERVICE = "Echoglass"
+
+# Before v0.9.0 the app was called LiveTranslate and kept its data under that name.
+_OLD_NAME = "LiveTranslate"
 # config field -> (keyring user name, environment variable fallback)
 API_KEYS = {
     "openai_api_key": ("openai", "OPENAI_API_KEY"),
@@ -25,6 +28,32 @@ API_KEYS = {
 # Runtime-only fields that must not be persisted.
 _SKIP = {"asr": {"max_no_speech_prob", "drop_music_phantoms", "device", "compute_type"},
          "translation": set(API_KEYS), "": {"device_index"}}
+
+
+def migrate_old_name() -> None:
+    """One-time move of LiveTranslate-era settings, models and API keys to Echoglass, so
+    nobody has to set things up or download the 3 GB speech model again."""
+    appdata = Path(os.environ.get("APPDATA", Path.home()))
+    local = Path(os.environ.get("LOCALAPPDATA", Path.home()))
+    moves = [(appdata / _OLD_NAME, SETTINGS_DIR),
+             (local / _OLD_NAME / "models", local / "Echoglass" / "models")]
+    for old, new in moves:
+        if old.is_dir() and not new.exists():
+            try:
+                new.parent.mkdir(parents=True, exist_ok=True)
+                os.replace(old, new)          # same drive: instant, even for 3 GB
+            except OSError:
+                import shutil
+                shutil.copytree(old, new, dirs_exist_ok=True)
+    try:
+        import keyring
+        for user, _env in API_KEYS.values():
+            if keyring.get_password(KEYRING_SERVICE, user) is None:
+                old_key = keyring.get_password(_OLD_NAME, user)
+                if old_key:
+                    keyring.set_password(KEYRING_SERVICE, user, old_key)
+    except Exception:
+        pass
 
 
 def _fill(cls, data: dict):

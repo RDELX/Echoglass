@@ -1,6 +1,6 @@
-"""Local HTTP API for the LiveTranslate browser extension.
+"""Local HTTP API for the Echoglass browser extension.
 
-Listens on 127.0.0.1 only and answers only requests whose Origin is the LiveTranslate
+Listens on 127.0.0.1 only and answers only requests whose Origin is the Echoglass
 extension, so ordinary web pages can't drive the app or spend the user's API keys.
 
     POST /api/status                   app + live-translation state
@@ -74,7 +74,7 @@ class ApiServer:
     def translate(self, text: str, target: str | None) -> dict:
         tc = copy.copy(self.cfg.translation)
         if tc.backend == "none":
-            raise ValueError("Translation is turned off in LiveTranslate. Pick a translator in the app.")
+            raise ValueError("Translation is turned off in Echoglass. Pick a translator in the app.")
         target = target or tc.target_language
         key = repr((tc.backend, tc.ollama_url, tc.ollama_model, tc.lmstudio_url, tc.lmstudio_model,
                     tc.openai_model, tc.claude_model, tc.openai_api_key, tc.deepl_api_key,
@@ -135,7 +135,7 @@ class _Handler(BaseHTTPRequestHandler):
         api = self.server_api
         try:
             if self.path == "/api/status":
-                return self._send(200, {"app": "LiveTranslate", "version": __version__, **api.status()})
+                return self._send(200, {"app": "Echoglass", "version": __version__, **api.status()})
             if self.path == "/api/translate":
                 text = str(body.get("text", "")).strip()
                 if not text:

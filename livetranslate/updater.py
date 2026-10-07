@@ -1,7 +1,7 @@
 """In-app updates from GitHub releases.
 
 Each release (made by packaging/build.ps1) contains:
-  - LiveTranslate-Setup-<ver>.exe + .bin slices   full installer
+  - Echoglass-Setup-<ver>.exe + .bin slices   full installer
   - update-from-<old>.zip                          only the files changed since <old>
   - files.json, SHA256SUMS.txt
 
@@ -28,9 +28,9 @@ from . import __version__
 
 log = logging.getLogger(__name__)
 
-RELEASES_REPO = "RDELX/LiveTranslate"
+RELEASES_REPO = "RDELX/Echoglass"
 INNO_APP_ID = "{6F2C1B7A-3E44-4C1B-9D4E-6A1E2B7C9F10}_is1"  # packaging/installer.iss AppId
-_UA = {"User-Agent": f"LiveTranslate/{__version__}", "Accept": "application/vnd.github+json"}
+_UA = {"User-Agent": f"Echoglass/{__version__}", "Accept": "application/vnd.github+json"}
 
 
 @dataclass
@@ -46,7 +46,7 @@ class Release:
         """What we need to download: the delta, or the whole installer."""
         if self.patch:
             return [self.patch, "SHA256SUMS.txt"]
-        return [n for n in self.assets if n.startswith("LiveTranslate-Setup-")] + ["SHA256SUMS.txt"]
+        return [n for n in self.assets if n.startswith("Echoglass-Setup-")] + ["SHA256SUMS.txt"]
 
     @property
     def size(self) -> int:
@@ -87,7 +87,7 @@ def check(repo: str = RELEASES_REPO, timeout: float = 6) -> Release | None:
 def download(rel: Release, on_progress: Callable[[int, int], None],
              cancelled: Callable[[], bool] = lambda: False) -> Path:
     """Download and verify what the update needs; returns the delta zip or the installer."""
-    folder = Path(tempfile.gettempdir()) / "LiveTranslate-update" / rel.version
+    folder = Path(tempfile.gettempdir()) / "Echoglass-update" / rel.version
     folder.mkdir(parents=True, exist_ok=True)
     total, done = rel.size, 0
     for name in rel.files:
@@ -152,7 +152,7 @@ try {
 } catch {
     Write-Output "Partial update failed: $_"
 }
-Start-Process (Join-Path $App "LiveTranslate.exe")
+Start-Process (Join-Path $App "Echoglass.exe")
 Stop-Transcript | Out-Null
 '''
 

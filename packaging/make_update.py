@@ -38,6 +38,10 @@ def manifest(app: Path, version: str, runtime: str) -> None:
 def delta(app: Path, old_manifest: Path, out: Path) -> None:
     old = json.loads(old_manifest.read_text(encoding="utf-8"))
     new = json.loads((app / MANIFEST).read_text(encoding="utf-8"))
+    exes = lambda m: {f for f in m["files"] if "/" not in f and f.endswith(".exe")}
+    if exes(old) != exes(new):
+        print(f"skip delta from {old['version']}: the app was renamed (needs the full installer)")
+        return
     if old.get("runtime") != new.get("runtime"):
         print(f"skip delta from {old['version']}: GPU runtime changed (needs the full installer)")
         return

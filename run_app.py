@@ -1,4 +1,4 @@
-"""Start the LiveTranslate window.
+"""Start the Echoglass window.
 
     .venv\\Scripts\\pythonw run_app.py     (no console)
     .venv\\Scripts\\python run_app.py      (with log output)
@@ -25,6 +25,7 @@ def main() -> None:
         sys.stdout = open(os.devnull, "w")
     if sys.stderr is None:
         sys.stderr = open(os.devnull, "w")
+    settings.migrate_old_name()
     settings.SETTINGS_DIR.mkdir(parents=True, exist_ok=True)
     logging.basicConfig(
         level=logging.INFO, format="%(asctime)s %(levelname).1s %(name)s: %(message)s",
@@ -37,7 +38,7 @@ def main() -> None:
     sys.excepthook = lambda *exc: logging.getLogger("crash").error("Uncaught exception", exc_info=exc)
 
     app = QApplication(sys.argv)
-    app.setApplicationName("LiveTranslate")
+    app.setApplicationName("Echoglass")
     app.setQuitOnLastWindowClosed(False)  # closing the window hides it to the tray
     app.setWindowIcon(QIcon(str(theme.ASSETS / "icon.png")))
     theme.apply(app)
