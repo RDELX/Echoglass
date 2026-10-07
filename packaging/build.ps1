@@ -16,7 +16,7 @@ $py = "$root\.venv\Scripts\python.exe"
 $version = (Get-Content "$root\livetranslate\__init__.py" | Select-String '__version__ = "(.+)"').Matches[0].Groups[1].Value
 Write-Host "Building Echoglass $version"
 
-& "$root\.venv\Scripts\pyinstaller.exe" --noconfirm --clean --distpath "$root\dist" --workpath "$root\build" "$root\packaging\Echoglass.spec"
+& "$root\.venv\Scripts\pyinstaller.exe" --noconfirm --distpath "$root\dist" --workpath "$root\build" "$root\packaging\Echoglass.spec"
 if ($LASTEXITCODE -ne 0) { throw "PyInstaller failed" }
 
 # The Chrome extension ships next to the exe for "Load unpacked" (Settings > General opens it).

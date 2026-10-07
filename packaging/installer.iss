@@ -28,6 +28,9 @@ SetupIconFile=icon.ico
 UninstallDisplayIcon={app}\Echoglass.exe
 Compression=lzma2/max
 SolidCompression=yes
+; Use all cores for LZMA2 (otherwise compression is effectively single-threaded).
+LZMANumBlockThreads=16
+LZMAUseSeparateProcess=yes
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 WizardStyle=modern
