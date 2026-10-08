@@ -128,6 +128,11 @@ class SettingsDialog(QDialog):
         self.check_updates = QCheckBox("Check for new versions when Echoglass starts")
         self.check_updates.setChecked(self.cfg.ui.check_updates)
         form.addRow("Updates", self.check_updates)
+        self.show_romaji = QCheckBox("Show romaji under Japanese text (window and overlay)")
+        self.show_romaji.setToolTip("Hepburn romaji, made on your PC. The first time, a 47 MB "
+                                    "dictionary is downloaded from PyPI.")
+        self.show_romaji.setChecked(self.cfg.ui.show_romaji)
+        form.addRow("Japanese", self.show_romaji)
 
         form.addRow(_section("Browser extension"))
         self.api_enabled = QCheckBox("Allow the Echoglass Chrome extension to connect")
@@ -325,6 +330,7 @@ class SettingsDialog(QDialog):
 
         cfg.ui.close_to_tray = self.close_to_tray.isChecked()
         cfg.ui.check_updates = self.check_updates.isChecked()
+        cfg.ui.show_romaji = self.show_romaji.isChecked()
         cfg.api.enabled = self.api_enabled.isChecked()
         cfg.api.port = self.api_port.value()
 

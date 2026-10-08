@@ -7,7 +7,8 @@ ROOT = SPECPATH + "\\.."
 
 datas, binaries, hiddenimports = [], [], []
 for pkg in ("faster_whisper", "ctranslate2", "pysilero_vad", "bs_roformer", "pyaudiowpatch", "soxr",
-            "rapidocr", "pyclipper", "shapely", "omegaconf"):
+            "rapidocr", "pyclipper", "shapely", "omegaconf", "cutlet", "fugashi", "jaconv",
+            "mojimoji"):
     d, b, h = collect_all(pkg)
     datas += d; binaries += b; hiddenimports += h
 
@@ -50,7 +51,8 @@ a = Analysis(
     hiddenimports=hiddenimports,
     # CTranslate2 uses PyTorch's cuBLAS/cuDNN in the packaged app (see asr/cuda_dlls.py),
     # so the separate nvidia-* wheels would only duplicate ~1.3 GB.
-    excludes=["torch", "torchaudio", "functorch", "torchgen", "nvidia",
+    # unidic-lite (250 MB) is downloaded on first use of romaji (see livetranslate/romaji.py).
+    excludes=["torch", "torchaudio", "functorch", "torchgen", "nvidia", "unidic_lite", "unidic",
               "tkinter", "matplotlib", "IPython", "pytest"],
     noarchive=False,
 )

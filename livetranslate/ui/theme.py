@@ -106,7 +106,8 @@ QTextBrowser {{ background: transparent; border: none; selection-background-colo
 #rowTranslation {{ color: {TEXT}; }}
 #rowTranslation[pending="true"] {{ color: {MUTED}; font-style: italic; }}
 #rowTranslation[failed="true"] {{ color: {ERROR}; }}
-#rowOriginal[live="true"], #rowTranslation[live="true"] {{ color: {TEXT_2}; font-style: italic; }}
+#rowRomaji {{ color: {TEXT_2}; }}
+#rowOriginal[live="true"], #rowTranslation[live="true"], #rowRomaji[live="true"] {{ color: {TEXT_2}; font-style: italic; }}
 
 #emptyTitle {{ font-size: 13pt; font-weight: 600; color: {TEXT_2}; }}
 #emptyHint {{ color: {MUTED}; }}

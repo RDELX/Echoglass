@@ -35,6 +35,11 @@ BACKEND_LABELS = [
 STATUS_COLORS = {"idle": theme.MUTED, "busy": theme.WARN, "live": theme.LIVE, "error": theme.ERROR}
 
 
+class _RomajiSignals(QObject):
+    progress = pyqtSignal(int, int)
+    loaded = pyqtSignal()
+
+
 class _ApiBridge(QObject):
     """Carries extension requests from API server threads onto the UI thread."""
     live = pyqtSignal(str)
@@ -112,6 +117,16 @@ class MainWindow(QMainWindow):
         self._quitting = False
         self.screen = ScreenTranslator(cfg)
         self.screen.status.connect(self._on_status)
+
+        from ..romaji import Romanizer
+        self.romanizer = Romanizer()
+        self._romaji_sig = _RomajiSignals()
+        self._romaji_sig.progress.connect(
+            lambda d, t: self._on_status(f"Downloading the romaji dictionary (first time only)… "
+                                         f"{d / 1e6:.0f} / {t / 1e6:.0f} MB", "busy"))
+        self._romaji_sig.loaded.connect(self._on_romaji_loaded)
+        if cfg.ui.show_romaji:
+            self._set_romaji(True)
         self._build_tray()
 
         self._bridge = _ApiBridge()
@@ -432,6 +447,9 @@ class MainWindow(QMainWindow):
             setattr(self.cfg, section, getattr(new, section))
         self.cfg.ui.close_to_tray = new.ui.close_to_tray
         self.cfg.ui.check_updates = new.ui.check_updates
+        if new.ui.show_romaji != self.cfg.ui.show_romaji:
+            self.cfg.ui.show_romaji = new.ui.show_romaji
+            self._set_romaji(new.ui.show_romaji)
         self.api.cfg = self.cfg
         if api_changed:
             self.api.stop()
@@ -514,6 +532,38 @@ class MainWindow(QMainWindow):
             self.stats.clear()
 
     # ---- live (partial) captions -----------------------------------------------------
+
+    # ---- romaji -----------------------------------------------------------------------
+
+    def _set_romaji(self, on: bool) -> None:
+        if not on:
+            self.view.romanize = None
+            self._refresh_romaji()
+            return
+        if self.romanizer.ready:
+            self._on_romaji_loaded()
+            return
+        import threading
+        threading.Thread(target=lambda: (self.romanizer.load(self._romaji_sig.progress.emit),
+                                         self._romaji_sig.loaded.emit()), daemon=True).start()
+
+    def _on_romaji_loaded(self) -> None:
+        if not self.cfg.ui.show_romaji:
+            return
+        if not self.romanizer.ready:
+            self._on_status(f"Romaji unavailable: {self.romanizer.error}", "error")
+            return
+        self.view.romanize = self.romanizer.romaji
+        self._refresh_romaji()
+        if not self.engine.running:
+            self._on_status("Romaji on", "idle")
+
+    def _refresh_romaji(self) -> None:
+        self.view.refresh_romaji()
+        if self._live is not None:
+            self.view.set_live(self._live)
+        if self.overlay.isVisible():
+            self.overlay.show_entries(self.view.entries, self._live)
 
     def _set_live(self, e: Entry | None) -> None:
         self._live = e

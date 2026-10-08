@@ -24,3 +24,7 @@ keyring
 
 # Screen text translation (OCR)
 rapidocr
+
+# Romaji (the unidic-lite dictionary is downloaded at runtime)
+cutlet
+fugashi

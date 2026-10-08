@@ -23,6 +23,7 @@ class Entry:
     text: str
     translation: str | None = None
     state: str = "pending"   # pending | done | same | failed | off
+    romaji: str | None = None  # only for Japanese lines, when "Show romaji" is on
 
 
 def _fmt_time(s: float) -> str:
@@ -89,9 +90,19 @@ class _Row(QWidget):
         self.time = QLabel(_fmt_time(e.start))
         self.time.setObjectName("rowTime")
         self.original = self._text_label("rowOriginal")
+        self.romaji = self._text_label("rowRomaji")
         self.translation = self._text_label("rowTranslation")
+        # Original + romaji stacked in one cell, so they stay together however tall the
+        # translation next to them is.
+        left = QWidget()
+        stack = QVBoxLayout(left)
+        stack.setContentsMargins(0, 0, 0, 0)
+        stack.setSpacing(2)
+        stack.addWidget(self.original)
+        stack.addWidget(self.romaji)
+        stack.addStretch(1)
         grid.addWidget(self.time, 0, 0)
-        grid.addWidget(self.original, 1, 0)
+        grid.addWidget(left, 1, 0)
         grid.addWidget(_divider(), 0, 1, 2, 1)
         grid.addWidget(self.translation, 1, 2)
         grid.setColumnStretch(0, 1)
@@ -103,7 +114,7 @@ class _Row(QWidget):
 
     def set_live(self, live: bool) -> None:
         """Dimmed style for the sentence that's still being spoken."""
-        for lbl in (self.original, self.translation):
+        for lbl in (self.original, self.romaji, self.translation):
             lbl.setProperty("live", live)
             lbl.style().unpolish(lbl)
             lbl.style().polish(lbl)
@@ -122,6 +133,7 @@ class _Row(QWidget):
     def set_font(self, pt: float) -> None:
         self._pt = pt
         self.original.setFont(theme.ui_font(pt, language=self._src_lang))
+        self.romaji.setFont(theme.ui_font(pt * 0.8))
         self.translation.setFont(theme.ui_font(pt, language=self._tgt_lang))
 
     def set_target_language(self, code: str) -> None:
@@ -131,6 +143,8 @@ class _Row(QWidget):
 
     def update_entry(self, e: Entry) -> None:
         self.original.setText(e.text)
+        self.romaji.setText(e.romaji or "")
+        self.romaji.setVisible(bool(e.romaji))
         text, style = _translation_text(e)
         self.translation.setText(text)
         self.translation.setProperty("pending", style == "pending")
@@ -236,13 +250,16 @@ class ParagraphView(QWidget):
 
     def render(self, entries: list[Entry], live: Entry | None = None) -> None:
         paras_l, paras_r, cur_l, cur_r = [], [], [], []
+        roms, cur_rom = [], []   # romaji per paragraph (Japanese lines only)
         prev_end, prev_lang = None, None
         for e in entries:
             if prev_end is not None and (e.start - prev_end > PARAGRAPH_GAP_S
                                          or e.language != prev_lang):
-                paras_l.append(cur_l); paras_r.append(cur_r)
-                cur_l, cur_r = [], []
+                paras_l.append(cur_l); paras_r.append(cur_r); roms.append(cur_rom)
+                cur_l, cur_r, cur_rom = [], [], []
             cur_l.append(self._span(e.text, e.language))
+            if e.romaji:
+                cur_rom.append(html.escape(e.romaji))
             text, style = _translation_text(e)
             if style == "pending":
                 cur_r.append(f'<span style="color:{theme.MUTED}">…</span>')
@@ -255,21 +272,30 @@ class ParagraphView(QWidget):
         if live is not None:
             dim = f'<span style="color:{theme.TEXT_2}">'
             cur_l.append(dim + self._span(live.text, live.language) + "</span>")
+            if live.romaji:
+                cur_rom.append(html.escape(live.romaji))
             text, style = _translation_text(live)
             if style != "pending" and text:
                 cur_r.append(dim + self._span(text, self.target_language) + "</span>")
         if cur_l:
-            paras_l.append(cur_l); paras_r.append(cur_r)
+            paras_l.append(cur_l); paras_r.append(cur_r); roms.append(cur_rom)
 
-        def to_html(paras):
-            return "".join(f'<p style="margin:0 0 14px 0; line-height:150%">{" ".join(p)}</p>'
-                           for p in paras)
-        for browser, sticky, paras in ((self.left, self._stickies[0], paras_l),
-                                       (self.right, self._stickies[1], paras_r)):
+        def to_html(paras, romaji=None):
+            out = []
+            for i, p in enumerate(paras):
+                rom = romaji[i] if romaji else None
+                gap = "4px" if rom else "14px"
+                out.append(f'<p style="margin:0 0 {gap} 0; line-height:150%">{" ".join(p)}</p>')
+                if rom:
+                    out.append(f'<p style="margin:0 0 14px 0; color:{theme.TEXT_2}; '
+                               f'font-size:{self._pt * 0.82:.1f}pt">{" ".join(rom)}</p>')
+            return "".join(out)
+        for browser, sticky, paras, rom in ((self.left, self._stickies[0], paras_l, roms),
+                                            (self.right, self._stickies[1], paras_r, None)):
             bar = browser.verticalScrollBar()
             keep = bar.value()
             stick = sticky.stick
-            browser.setHtml(to_html(paras))
+            browser.setHtml(to_html(paras, rom))
             bar.setValue(bar.maximum() if stick else keep)
             sticky.stick = stick
 
@@ -283,6 +309,7 @@ class ParagraphView(QWidget):
             s.to_bottom()
 
     def set_font_size(self, pt: float) -> None:
+        self._pt = pt
         for b in (self.left, self.right):
             b.setFont(theme.ui_font(pt))
 
@@ -298,6 +325,8 @@ class TranscriptView(QFrame):
         self.entries: list[Entry] = []
         self._by_id: dict[int, Entry] = {}
         self.live: Entry | None = None
+        # (text, language) -> romaji or None; set by the window when "Show romaji" is on
+        self.romanize = None
         self.mode = "lines"
         self._font_pt = 13.0
 
@@ -376,6 +405,8 @@ class TranscriptView(QFrame):
 
     def add_original(self, entry_id: int, t, translating: bool) -> None:
         e = Entry(entry_id, t.start, t.language, t.text, state="pending" if translating else "off")
+        if self.romanize:
+            e.romaji = self.romanize(e.text, e.language)
         self.entries.append(e)
         self._by_id[e.id] = e
         if len(self.entries) > MAX_ENTRIES:
@@ -403,8 +434,16 @@ class TranscriptView(QFrame):
         else:
             self.paragraphs.render(self.entries, self.live)
 
+    def refresh_romaji(self) -> None:
+        """Recompute romaji for every line (after the setting changed) and redraw."""
+        for e in self.entries:
+            e.romaji = self.romanize(e.text, e.language) if self.romanize else None
+        self.set_mode(self.mode)
+
     def set_live(self, e: Entry | None) -> None:
         """Show (or clear) the sentence that's still being spoken, below the finished lines."""
+        if e is not None:
+            e.romaji = self.romanize(e.text, e.language) if self.romanize else None
         self.live = e
         if self.mode == "lines":
             self.lines.set_live(e)

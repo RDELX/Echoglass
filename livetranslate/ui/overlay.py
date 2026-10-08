@@ -7,6 +7,8 @@ Rolling captions: the sentence still being spoken is shown live (dimmed) at the 
 grows as it's recognised; when lines are added the text block slides up smoothly.
 """
 
+import html
+
 from PyQt6.QtCore import QEasingCurve, QPoint, QPropertyAnimation, QRect, Qt, QTimer
 from PyQt6.QtGui import QColor, QFont, QGuiApplication, QPainter, QPen
 from PyQt6.QtWidgets import (QGraphicsDropShadowEffect, QLabel, QSizeGrip, QVBoxLayout,
@@ -143,7 +145,13 @@ class SubtitleOverlay(QWidget):
                 continue
             live = e is self._live
             orig.setFont(theme.ui_font(self.cfg.font_size * 0.62, language=e.language))
-            orig.setText(e.text)
+            if e.romaji:  # small romaji line under the Japanese
+                orig.setTextFormat(Qt.TextFormat.RichText)
+                orig.setText(f"{html.escape(e.text)}<br><span style='font-size:80%'>"
+                             f"{html.escape(e.romaji)}</span>")
+            else:
+                orig.setTextFormat(Qt.TextFormat.PlainText)
+                orig.setText(e.text)
             orig.setVisible(self.cfg.show_original and e.state not in ("same", "off"))
             if e.state == "done":
                 trans.setText(e.translation)

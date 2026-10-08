@@ -55,6 +55,14 @@ def main() -> None:
         _selftest(win, sys.argv[2])
     elif len(sys.argv) > 2 and sys.argv[1] == "--selftest-ocr":
         _selftest_ocr(win, sys.argv[2])
+    elif len(sys.argv) > 2 and sys.argv[1] == "--selftest-romaji":
+        from livetranslate.romaji import Romanizer
+        r = Romanizer()
+        r.load()
+        logging.getLogger("selftest").info("SELFTEST-ROMAJI %s -> %s (%s)", sys.argv[2],
+                                           r.romaji(sys.argv[2], "ja"), r.error)
+        win.quit_app()
+        return
     sys.exit(app.exec())
 
 
