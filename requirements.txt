@@ -14,7 +14,7 @@ anthropic
 
 # Music mode: vocal isolation (PyTorch from the CUDA index)
 # pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu128
-demucs
+BS-RoFormer==0.3.10  # Mel-Band RoFormer (weights from HF KimberleyJSN/melbandroformer)
 
 # Stage 3: UI
 PyQt6

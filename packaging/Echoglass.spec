@@ -6,7 +6,7 @@ from PyInstaller.utils.hooks import collect_all, collect_data_files, collect_dyn
 ROOT = SPECPATH + "\\.."
 
 datas, binaries, hiddenimports = [], [], []
-for pkg in ("faster_whisper", "ctranslate2", "pysilero_vad", "demucs", "pyaudiowpatch", "soxr",
+for pkg in ("faster_whisper", "ctranslate2", "pysilero_vad", "bs_roformer", "pyaudiowpatch", "soxr",
             "rapidocr", "pyclipper", "shapely", "omegaconf"):
     d, b, h = collect_all(pkg)
     datas += d; binaries += b; hiddenimports += h
@@ -15,7 +15,8 @@ for pkg in ("faster_whisper", "ctranslate2", "pysilero_vad", "demucs", "pyaudiow
 # download.pytorch.org into _internal\ (see make_deps.py), where the onedir app imports them
 # from disk. Their pure-Python dependencies are bundled here instead.
 for pkg in ("sympy", "mpmath", "networkx", "jinja2", "markupsafe", "filelock", "fsspec",
-            "typing_extensions", "julius", "einops", "openunmix", "yaml"):
+            "typing_extensions", "einops", "rotary_embedding_torch", "beartype", "librosa",
+            "yaml"):
     try:
         d, b, h = collect_all(pkg)
         datas += d; binaries += b; hiddenimports += h

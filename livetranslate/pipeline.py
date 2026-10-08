@@ -28,12 +28,12 @@ _STOP = object()
 
 class Pipeline:
     def __init__(self, cfg: Config, on_transcript: Callable[[Transcript], None],
-                 transcriber: Transcriber | None = None):
+                 transcriber: Transcriber | None = None, separator=None):
         self.cfg = cfg
         self.on_transcript = on_transcript
         self.transcriber = transcriber or Transcriber(cfg.asr)
-        self.separator = None
-        if cfg.music_mode:
+        self.separator = separator
+        if cfg.music_mode and self.separator is None:
             from .audio.separator import VocalSeparator
             self.separator = VocalSeparator()
             self.separator.warmup()
@@ -47,7 +47,9 @@ class Pipeline:
 
     def start(self) -> None:
         self.start_without_capture()
-        self._capture = LoopbackCapture(self._audio_q, self.cfg.device_index)
+        # Music mode gets the original stereo at the device rate (the separator needs it).
+        self._capture = LoopbackCapture(self._audio_q, self.cfg.device_index,
+                                        raw=self.separator is not None)
         self._capture.start()
 
     @property

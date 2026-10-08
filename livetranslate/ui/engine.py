@@ -32,6 +32,7 @@ class Engine(QObject):
         self.running = False
         self.busy = False
         self._transcriber: Transcriber | None = None
+        self._separator = None   # loaded once, reused across Start/Stop
         self._pipeline: Pipeline | None = None
         self._worker: TranslationWorker | None = None
         self._ids = itertools.count(1)
@@ -92,9 +93,20 @@ class Engine(QObject):
             self._worker.start()
             self._worker.warmup()
 
+            separator = None
             if self.cfg.music_mode:
                 self.status.emit("Loading music mode…", "busy")
-            self._pipeline = Pipeline(self.cfg, self._on_transcript, transcriber=self._transcriber)
+                from ..audio.separator import VocalSeparator
+
+                def sep_progress(done: float, total: float) -> None:
+                    self.status.emit(f"Downloading the music mode model (first time only)… "
+                                     f"{done / 1e9:.2f} / {total / 1e9:.2f} GB", "busy")
+                if self._separator is None:
+                    self._separator = VocalSeparator(on_download=sep_progress)
+                    self._separator.warmup()
+                separator = self._separator.fresh()
+            self._pipeline = Pipeline(self.cfg, self._on_transcript, transcriber=self._transcriber,
+                                      separator=separator)
             self._pipeline.start()
         except Exception as e:
             log.exception("Start failed")

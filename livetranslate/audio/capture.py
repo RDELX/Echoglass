@@ -38,12 +38,18 @@ def list_loopback_devices() -> list[dict]:
 class LoopbackCapture:
     """Captures system audio and pushes 16 kHz mono float32 chunks onto `out_queue`.
 
+    With `raw=True` (music mode) it pushes the device's own stereo at its native rate
+    instead, wrapped in `RawAudio`, because the vocal separator needs the full-quality signal.
+
     WASAPI loopback only delivers data while something is playing, so the queue
     simply goes quiet during silence.
     """
 
-    def __init__(self, out_queue: "queue.Queue[np.ndarray]", device_index: int | None = None):
+    def __init__(self, out_queue: "queue.Queue[np.ndarray]", device_index: int | None = None,
+                 raw: bool = False):
         self.out_queue = out_queue
+        self.raw = raw
+        self._rate = 0
         self.device_index = device_index
         self.device_name = ""
         self._pa: pyaudio.PyAudio | None = None
@@ -59,6 +65,7 @@ class LoopbackCapture:
             dev = self._pa.get_device_info_by_index(self.device_index)
         self.device_name = dev["name"]
         rate = int(dev["defaultSampleRate"])
+        self._rate = rate
         self._channels = int(dev["maxInputChannels"])
         self._resampler = soxr.ResampleStream(rate, SAMPLE_RATE, 1, dtype="float32", quality="HQ")
         log.info("Capturing '%s' (%d Hz, %d ch)", self.device_name, rate, self._channels)
@@ -75,6 +82,10 @@ class LoopbackCapture:
 
     def _callback(self, in_data, frame_count, time_info, status):
         frames = np.frombuffer(in_data, dtype=np.float32).reshape(-1, self._channels)
+        if self.raw:
+            from .separator import RawAudio
+            self.out_queue.put(RawAudio(frames.copy(), self._rate))
+            return (None, pyaudio.paContinue)
         mono = frames.mean(axis=1)
         out = self._resampler.resample_chunk(mono)
         if out.size:
