@@ -154,9 +154,18 @@ class MainWindow(QMainWindow):
         self.tray.show()
 
     def _show_window(self) -> None:
-        self.showNormal()
+        if not self.isVisible():
+            self.show()
+        if self.isMinimized():  # restore, keeping "maximized" if it was
+            self.setWindowState((self.windowState() & ~Qt.WindowState.WindowMinimized)
+                                | Qt.WindowState.WindowActive)
         self.raise_()
         self.activateWindow()
+        try:  # Qt's activateWindow alone may only flash the taskbar button
+            import ctypes
+            ctypes.windll.user32.SetForegroundWindow(int(self.winId()))
+        except Exception:
+            pass
 
     def _prepare_for_update(self) -> None:
         """Everything closeEvent does on quit, before the installer replaces our files."""
